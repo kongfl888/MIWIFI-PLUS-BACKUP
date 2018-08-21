@@ -1,0 +1,1212 @@
+<%
+--[[
+	Info	ShadowSocks
+]]--
+local ver = require("xiaoqiang.XQVersion").webVersion
+local uci = require("luci.model.uci").cursor()
+local hardwareModel = tostring(uci:get("misc", "hardware", "model"))
+%>
+<%include("web/inc/head")%>
+<title><%:小米路由器%></title>
+<meta name="viewserver_port" content="width=1200">
+<link href="<%=resource%>/web/css/bc.css?v=<%=ver%>" rel="stylesheet">
+<link href="<%=resource%>/web/css/yuneon.css?v=<%=ver%>" rel="stylesheet">
+</head>
+<body>
+<div id="doc">
+	<%include("web/inc/header")%>
+	<div id="bd">
+		<div class="mod-set mod-ss">
+			<div class="hd">
+				<h3><%:SHADOWSOCKS%></h3>
+			</div>
+			<div class="bd">
+				<div class="section-list">
+					<h4><%:服务列表: %></h4>
+					<table class="table">
+						<thead>
+							<tr>
+								<th style="width:200px"><%:名称%></th>
+								<th style="width:100px"><%:加密类型%></th>
+								<th><%:服务器地址%></th>
+								<th style="width:70px"><%:端口%></th>
+								<th style="width:70px"><%:状态%></th>
+								<th class="center" width="242"><%:操作%></th>
+							</tr>
+						</thead>
+						<tbody id="sslist">
+							<tr>
+								<td class="center" colspan="6"><%:查询中...%></td>
+							</tr>
+						</tbody>
+					</table>
+					<div class="btns">
+						<a href="#" class="btn btn-dft btn-l" id="btnadditem"><span style="width:200px"><%:添加服务%></span></a>
+						<a href="#" class="btn btn-dft btn-l" id="btnImport"><span style="width:200px"><%:批量导入%></span></a>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="mod-set mod-ss">
+			<div class="hd">
+				<h3><%:综合设置%></h3>
+			</div>
+			<div class="bd">
+				<div id="ruleon" class="ruleon">
+					<div class="tab-con-item" style="margin-top:50px">
+						<form class="form" class="form" id="generalinfo">
+						</form>
+					</div>
+					<div class="item-contral" style="clear:both;">
+						<button type="submit" class="btn btn-primary btn-l" id="generalbtnSave"><span><%:保存并应用%></span></button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="mod-set mod-ss">
+			<div class="hd">
+				<h3><%:目标分流%></h3>
+			</div>
+			<div class="bd" >
+				<div id="ruleon" class="ruleon">
+					<div id="rulemodepac" class="tab clearfix" style="margin-top:30px;"></div>
+					<div id="rulemode" class="tab">
+						<ul class="clearfix">
+							<li class="first active" data-mode="1">
+								<%:白名单列表%>
+							</li>
+							<li data-mode="2">
+								<%:黑名单列表%>
+							</li>
+						</ul>
+					</div>
+					<div id="rulemodedesc" class="rulemodedesc">
+						<p><%:可以通过添加白名单，使其中的域名走加速流量（白名单优先级最高）%></p>
+						<p><%:可以通过添加黑名单，使其中的域名走正常流量（白名单优先级最高）%></p>
+					</div>
+					<div id="rulemodecont">
+						<div style="display:none;">
+							<table class="table">
+								<thead>
+									<th><%:名称%></th>
+									<th style="width:80px; text-align:center;"><%:操作%></th>
+								</thead>
+								<tbody id="ruledomainlTbody">
+								</tbody>
+							</table>
+							<div class="btn-wrap">
+								<button class="btn btn-dft btn-l" id="addruledomain"><span><%:添加域名%></span></button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="mod-set mod-ss">
+			<div class="hd">
+				<h3><%:设备分流%></h3>
+				<div class="switch">
+					<a href="#" id="deviceswitch" class="btn-switch btn-switch-off"></a>
+				</div>
+			</div>
+			<div class="bd">
+				<div id="deviceoff" class="ruleoff"><p><%:你可以自定义哪些设备走加速的流量%></p></div>
+				<div id="deviceon" class="ruleon" style="display:none;">
+					<div id="devicedesc">
+						<p><%:可以通过添加设备来限定哪些设备可以使用加速流量%></p>
+					</div>
+					<div id="devicecont">
+						<table class="table">
+							<thead>
+								<th><%:名称%></th>
+								<th><%:MAC地址%></th>
+								<th style="width:80px; text-align:center;"><%:操作%></th>
+							</thead>
+							<tbody id="devicemacTbody">
+							</tbody>
+						</table>
+						<div class="btn-wrap">
+							<button class="btn btn-dft" id="adddevicelist"><span><%:从设备列表添加设备%></span></button>
+							<button class="btn btn-dft" id="adddevicemac"><span><%:通过MAC地址添加%></span></button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<%include("web/inc/footer")%>
+</div>
+<%include("web/inc/g.js")%>
+<script type="tmpl/html" id="tplsetss">
+<form action="<%=luci.dispatcher.build_url("api", "yuneon", "ss_set")%>" class="form form-ssadd" method="post" name="ss" id="ss">
+	{if($id && $id !='')}
+		<input type="hidden" name="id" value="{$id}">
+	{/if}
+	<div class="form-item">
+		<label class="k"><%:线路名称%></label>
+		<span class="v"><input type="text" name="server_name" reqMsg = "<%:线路名称%>" class="ipt-text" value="{$server_name}"></span>
+		<em class="t"></em>
+	</div>
+	<div class="form-item-select">
+		<label class="k"><%:加密类型%></label>
+		<span class="v">
+			<select name="encrypt" class="beautify sstype" id="encryptmode" style="width:208px;">
+				<option value="rc4-md5" {if($encrypt == 'rc4-md5')}selected="selected"{/if}>rc4-md5</option>
+				<option value="aes-128-gcm" {if($encrypt == 'aes-128-gcm')}selected="selected"{/if}>aes-128-gcm</option>
+				<option value="aes-192-gcm" {if($encrypt == 'aes-192-gcm')}selected="selected"{/if}>aes-192-gcm</option>
+				<option value="aes-256-gcm" {if($encrypt == 'aes-256-gcm')}selected="selected"{/if}>aes-256-gcm</option>
+				<option value="aes-128-cfb" {if($encrypt == 'aes-128-cfb')}selected="selected"{/if}>aes-128-cfb</option>
+				<option value="aes-192-cfb" {if($encrypt == 'aes-192-cfb')}selected="selected"{/if}>aes-192-cfb</option>
+				<option value="aes-256-cfb" {if($encrypt == 'aes-256-cfb')}selected="selected"{/if}>aes-256-cfb</option>
+				<option value="aes-128-ctr" {if($encrypt == 'aes-128-ctr')}selected="selected"{/if}>aes-128-ctr</option>
+				<option value="aes-192-ctr" {if($encrypt == 'aes-192-ctr')}selected="selected"{/if}>aes-192-ctr</option>
+				<option value="aes-256-ctr" {if($encrypt == 'aes-256-ctr')}selected="selected"{/if}>aes-256-ctr</option>
+				<option value="camellia-128-cfb" {if($encrypt == 'camellia-128-cfb')}selected="selected"{/if}>camellia-128-cfb</option>
+				<option value="camellia-192-cfb" {if($encrypt == 'camellia-192-cfb')}selected="selected"{/if}>camellia-192-cfb</option>
+				<option value="camellia-256-cfb" {if($encrypt == 'camellia-256-cfb')}selected="selected"{/if}>camellia-256-cfb</option>
+				<option value="bf-cfb" {if($encrypt == 'bf-cfb')}selected="selected"{/if}>bf-cfb</option>
+				<option value="salsa20" {if($encrypt == 'salsa20')}selected="selected"{/if}>salsa20</option>
+				<option value="chacha20" {if($encrypt == 'chacha20')}selected="chacha20"{/if}>chacha20</option>
+				<option value="chacha20-ietf" {if($encrypt == 'chacha20-ietf')}selected="chacha20-ietf"{/if}>chacha20-ietf</option>
+				<option value="chacha20-ietf-poly1305" {if($encrypt == 'chacha20-ietf-poly1305')}selected="chacha20-ietf-poly1305"{/if}>chacha20-ietf-poly1305</option>
+			</select>
+		</span>
+		<em class="t"></em>
+	</div>
+	<div class="form-item">
+		<label class="k"><%:服务器%></label>
+		<span class="v"><input type="text" name="server" reqMsg = "<%:服务器%>" datatype="reg-/^[a-zA-Z0-9][a-zA-Z0-9\-]*[\.]([a-zA-Z0-9][a-zA-Z0-9\-]*[\.])*[a-zA-Z0-9]+$/" class="ipt-text" value="{$server}"></span>
+		<em class="t"></em>
+	</div>
+	<div class="form-item">
+		<label class="k"><%:端口%></label>
+		<span class="v"><input type="text" name="server_port" reqMsg = "<%:端口%>" class="ipt-text" datatype="n-5" minValue="1" maxValue="65535" value="{$server_port}"></span>
+		<em class="t"></em>
+	</div>
+	<div class="form-item">
+		<label class="k"><%:密码%></label>
+		<span class="v"><input type="password" name="password" reqMsg = "<%:密码%>" class="ipt-text" data-type="password" value="{$password}"></span>
+		<em class="t"></em>
+	</div>
+	<div class="item-contral">
+		<button type="submit" class="btn btn-primary btn-l" id="btnSave"><span><%:保存%></span></button>
+	</div>
+</form>
+</script>
+
+<script type="tmpl/text" id="importform">
+<form class="form form-import" name="importForm" id="importForm" method="post" enctype="multipart/form-data" >
+<p><%:批量导入所需配置文件一般由SS服务商后台提供下载，或于SS windows客户端文件夹内获得，文件名后缀为".json"。%></p><br/>
+	<div class="item">
+		<label class="k"><%:请选择配置文件:%></label>
+		<span class="v">
+			<input type="file" name="jsonfile" id="jsonfile" accept=".json"/>
+		</span>
+		<em class="t"></em>
+	</div>
+	<div class="item item-contral">
+		<button type="button" class="btn btn-block btn-primary-disabled" id="importFormBtn" disabled><span><%:开始导入%></span></button>
+	</div>
+</form>
+</script>
+
+<script type="tmpl/html" id="tplsslist">
+{if($sslist.length > 0)}
+{for(var i=0; i<$sslist.length; i++)}
+<tr id="{$sslist[i].id}" class="{if($sslist[i].iscurrent == 1)}conn-st-5{else}conn-st-3{/if}">
+	<td style="padding-right:20px;">{$sslist[i].server_name}</td>
+	<td style="padding-right:20px">{$sslist[i].encrypt}</td>
+	<td style="padding-right:20px">{$sslist[i].server}</td>
+	<td style="padding-right:20px">{$sslist[i].server_port}</td>
+	<td class="conn-st-text">
+		<span class="ss-status">
+			<span class="val">
+			{if($sslist[i].iscurrent == 1)}
+				<%:查询中...%>
+			{else}
+				<%:未启用%>
+			{/if}
+			</span>
+		</span>
+	</td>
+	<td>
+		<div class="conn-opt conn-opt-1">
+			<button class="btn btn-primary btn-block btn-conn-stop" data-id={$sslist[i].id}><span><%:断开连接%></span></button>
+		</div>
+		<div class="conn-opt conn-opt-3">
+			<button class="l btn btn-dft btn-conn-start" data-id={$sslist[i].id}><span><%:连接%></span></button>
+			<button class="l btn btn-dft btn-edit" data-id={$sslist[i].id}><span><%:编辑%></span></button>
+			<button class="r btn btn-dft btn-del" data-id={$sslist[i].id}><span><%:删除%></span></button>
+		</div>
+		<div class="conn-opt conn-opt-4">
+			<button class="l btn btn-dft btn-conn-start" data-id={$sslist[i].id}><span><%:重连%></span></button>
+			<button class="l btn btn-dft btn-edit" data-id={$sslist[i].id}><span><%:编辑%></span></button>
+			<button class="1 btn btn-dft btn-conn-stop" data-id={$sslist[i].id}><span><%:断开%></span></button>
+		</div>
+	</td>
+</tr>
+{/for}
+{else}
+<tr>
+	<td colspan="6" class="center"><%:没有设置信息%></td>
+</tr>
+{/if}
+</script>
+
+<script type="tmpl/html" id="tmplErrtip">
+<div class="status-err-tips">
+	<span class="arrow"></span>
+	{$cont}
+</div>
+</script>
+
+<script type="tmpl/html" id="tmplruleurl">
+<tr>
+	<td>{$url}</td>
+	<td><button class="btn btn-dft rule-del" data-domain="{$url}"><span><%:删除%></span></button></td>
+</tr>
+</script>
+
+<script type="tmpl/html" id="tmplAdddomain">
+	<div class="dialog-add-bymac">
+		<form class="form" name="adddomain" id="adddomain">
+			<p><%:请输入地址%></p>
+			<div class="form-item">
+				<label class="k">
+					<%:地址%>
+				</label>
+				<span class="v">
+					<input type="text" id="domain" name="domain" class="ipt-text" reqMsg="<%:地址%>" />
+				</span>
+				<em class="t"></em>
+			</div>
+			<div class="form-contral">
+				<button type="submit" class="btn btn-primary" id="domainAddSubmit"><span><%:确定%></span>
+				</button>
+				<button type="submit" class="btn btn-dft" id="domainAddClose"><span><%:取消%></span>
+				</button>
+			</div>
+		</form>
+	</div>
+</script>
+
+<script type="tmpl/html" id="tmplgeneralinfo">
+	<div class="form-item-select">
+		<label class="k"><%:总体规则%></label>
+		<span class="v">
+			<select name="pacmode" id="pacmode" class="beautify sstype">
+				<option value="0" {if($pacmode == '0')}selected="selected"{/if}><%:穿过GFW%></option>
+				<option value="1" {if($pacmode == '1')}selected="selected"{/if}><%:绕过大陆%></option>
+				<option value="2" {if($pacmode == '2')}selected="selected"{/if}><%:全局模式%></option>
+			</select>
+		</span>
+		<em class="t"><a href="#" id='btnruleupdate' style='color:green;text-decoration:none;display:none;' disabled="false"><%:更新%></a><span id="ruledate" style="display:none;"><%: 【最后更新：{$ruledate}】%></span></em>
+	</div>
+	<div class="form-item-select">
+		<label class="k"><%:DNS模式%></label>
+		<span class="v">
+			<select name="dnsmode" class="beautify sstype" id="dnsmode">
+				<option value="0" {if($dnsmode == 0)}selected="selected"{/if}><%:转发至TCP代理%></option>
+				<option value="1" {if($dnsmode == 1)}selected="selected"{/if}><%:转发至UDP代理%></option>
+				<option value="2" {if($dnsmode == 2)}selected="selected"{/if}><%:不做转发处理%></option>
+			</select>
+		</span>
+		<em class="t"></em>
+	</div>
+	<div class="form-item-select">
+		<label class="k"><%:清洁DNS%></label>
+		<span class="v">
+			<select name="cleandns" class="beautify sstype" id="cleandns">
+				<option value="202.181.224.2" {if($cleandns == '202.181.224.2')}selected="selected"{/if}><%:中国香港服务器%></option>
+				<option value="168.95.1.1" {if($cleandns == '168.95.1.1')}selected="selected"{/if}><%:中国蛙岛服务器1%></option>
+				<option value="168.95.192.1" {if($cleandns == '168.95.192.1')}selected="selected"{/if}><%:中国蛙岛服务器2%></option>
+				<option value="8.8.8.8" {if($cleandns == '8.8.8.8')}selected="selected"{/if}><%:谷歌服务器1%></option>
+				<option value="8.8.4.4" {if($cleandns == '8.8.4.4')}selected="selected"{/if}><%:谷歌服务器2%></option>
+				<option value="208.67.220.123" style="color:darkkhaki" {if($cleandns == '208.67.220.123')}selected="selected"{/if}><%:OpenDNS服务器1%></option>
+				<option value="208.67.220.220" style="color:darkkhaki" {if($cleandns == '208.67.220.220')}selected="selected"{/if}><%:OpenDNS服务器2%></option>
+				<option value="208.67.222.123" style="color:darkkhaki" {if($cleandns == '208.67.222.123')}selected="selected"{/if}><%:OpenDNS服务器3%></option>
+				<option value="208.67.222.222" style="color:darkkhaki" {if($cleandns == '208.67.222.222')}selected="selected"{/if}><%:OpenDNS服务器4%></option>
+				<option value="8.20.247.20" style="color:darkkhaki" {if($cleandns == '8.20.247.20')}selected="selected"{/if}><%:科摩多安全服务器1%></option>
+				<option value="8.26.56.26" style="color:darkkhaki" {if($cleandns == '8.26.56.26')}selected="selected"{/if}><%:科摩多安全服务器2%></option>
+				<option value="84.200.69.80" {if($cleandns == '84.200.69.80')}selected="selected"{/if}><%:DNS.WATCH服务器1%></option>
+				<option value="84.200.70.40" {if($cleandns == '84.200.70.40')}selected="selected"{/if}><%:DNS.WATCH服务器2%></option>
+				<option value="165.87.13.129" {if($cleandns == '165.87.13.129')}selected="selected"{/if}><%:美国AT&T服务器1%></option>
+				<option value="165.87.201.244" {if($cleandns == '165.87.201.244')}selected="selected"{/if}><%:美国AT&T服务器2%></option>
+				<option value="205.171.2.65" {if($cleandns == '205.171.2.65')}selected="selected"{/if}><%:美国Qwest服务器1%></option>
+				<option value="205.171.3.65" {if($cleandns == '205.171.3.65')}selected="selected"{/if}><%:美国Qwest服务器2%></option>
+			</select>
+		</span>
+		<em class="t"><span>列表中<span style="color:darkkhaki">卡其色</span>服务器自动使用443端口</span></em>
+	</div>
+	<div class="form-item">
+		<label class="k"><%:本地端口%></label>
+		<span class="v"><input type="text" name="localport" id="localport" reqMsg = "<%:本地端口%>" class="ipt-text" datatype="n-5" minValue="1" maxValue="65535" value="{$localport}"></span>
+		<em class="t"></em>
+	</div>
+</script>
+
+<script type="tmpl/html" id="tmplErrtip">
+<div class="status-err-tips">
+	<span class="arrow"></span>
+	{$cont}
+</div>
+</script>
+<script type="tmpl/html" id="tmpldevicemac">
+<tr>
+	<td>{$name}</td>
+	<td>{$mac}</td>
+	<td><button class="btn btn-dft device-del" data-macs="{$mac}"><span><%:删除%></span></button></td>
+</tr>
+</script>
+
+<script type="tmpl/html" id="tmplAddList">
+	<div class="dialog-listadd-form-wrap">
+		<form  class="form" id="listAdd">
+			<table class="table">
+				<thead>
+					<tr>
+						<th><%:设备名称%></th>
+						<th width="90"><%:状态%></th>
+						<th><%:MAC地址%></th>
+						<th width="30"><%:操作%></th>
+					</tr>
+				</thead>
+				<tbody id="dialogdeviceslist">
+					<tr>
+						<td colspan="4"><%:正在查询中...%></td>
+					</tr>
+				</tbody>
+			</table>
+			<div class="form-contral">
+				<button type="submit" class="btn btn-primary" id="listAddSubmit"><span><%:确定%></span>
+				</button>
+				<button type="submit" class="btn btn-dft" id="listAddClose"><span><%:取消%></span>
+				</button>
+			</div>
+		</form>
+	</div>
+</script>
+<script type="tmpl/html" id="tmplDevice">
+	<tr>
+		<td>{$name}</td>
+		<td>{$status}</td>
+		<td>{$mac}</td>
+		<td>
+			<input class="deviceinput" type="checkbox" name="nowmac" value="{$mac}" />
+		</td>
+	</tr>
+</script>
+<script type="tmpl/html" id="tmplAddmac">
+	<div class="dialog-add-bymac">
+		<form class="form" name="addbymac" id="addbymac">
+			<p><%:请输入设备的MAC地址%></p>
+			<div class="form-item">
+				<label class="k">
+					<%:MAC地址%>
+				</label>
+				<span class="v">
+					<input type="text" id="macaddr" name="addr" class="ipt-text" datatype="macaddr" reqMsg="<%:MAC地址%>" />
+				</span>
+				<em class="t"></em>
+			</div>
+			<div class="form-contral">
+				<button type="submit" class="btn btn-primary" id="macAddSubmit"><span><%:确定%></span>
+				</button>
+				<button type="submit" class="btn btn-dft" id="macAddClose"><span><%:取消%></span>
+				</button>
+			</div>
+		</form>
+	</div>
+</script>
+<script>
+var modelss = (function(){
+	var timer = null,
+		dlgform,
+		currentId,
+		importform,
+		ajaxdone = true;
+	//var ssConnectStatus = -1;
+	
+	function ssInfo(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_info")%>', {}, function(rsp){
+			if (rsp.code == 0) {
+				var tpl = $('#tplsslist').html(),
+					tpldata = [],
+					list = rsp.list,
+					info = rsp.info,
+					iscurrent = 0;
+					currentId = info.id;
+					
+				if (list.length > 0) {
+					for (var i = 0; i < list.length; i++) {
+						if ( list[i].id == info.id) {
+							 iscurrent = 1;
+						 } else {
+							 iscurrent = 0;
+						 }
+						var item = {
+							id: list[i].id,
+							encrypt: StringH.encode4HtmlValue(list[i].method),
+							server: StringH.encode4HtmlValue(list[i].server),
+							server_port: StringH.encode4HtmlValue(list[i].server_port),
+							server_name: StringH.encode4HtmlValue(list[i].server_name),
+							iscurrent: iscurrent
+						}
+						tpldata.push(item);
+					}
+				}
+				$('#sslist').html(tpl.tmpl({sslist: tpldata}) );
+			}
+		});
+	}
+
+	function ssStatus(){
+		ajaxdone = false;
+		 $.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_status")%>', {}, function(rsp){
+			ajaxdone = true;
+			if (rsp.code == 0) {
+				var status = rsp.status,
+				statusText = '',
+				trstatus = 'conn-st-1',
+				ssConnectStatus = status;
+				switch(status){
+					case 0:
+						statusText = '<%:已启用%>';
+						trstatus = 'conn-st-1';
+						break;
+					case 1:
+						trstatus = 'conn-st-4';
+						statusText = '<%:连接异常%>';
+						break;
+					case 2:
+						statusText = '<%:链路异常%>';
+						trstatus = 'conn-st-4';
+						break;
+					case 3:
+						statusText = '<%:程序异常%>';
+						trstatus = 'conn-st-4';
+						break;
+					case 4:
+						statusText = '<%:未启用%>';
+						trstatus = 'conn-st-3';
+						break;
+					default:
+						statusText = '<%:未启用%>';
+						trstatus = 'conn-st-3';
+						break;
+				}
+
+				if (rsp.errcode) {
+					trstatus = 'conn-st-4';
+					// statusText = rsp.errmsg;
+					statusText = '<span class="errmsg-wrap" data-error="' + rsp.errmsg + '"><%:连接失败%></span>';
+				};
+				var el = document.getElementById(currentId);
+				if ( el ) {
+					el.className = trstatus;
+					$('.ss-status .val', el).html(statusText);
+				}
+			}
+		});
+	};
+	function ssSwitch(){
+		$('body').delegate('.btn-conn-start', 'click', function(e){
+			e.preventDefault();
+			var root = $(this).parents('tr'),
+			id = $(this).attr('data-id');
+			$.pub( 'loading:start' );
+			$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_switch")%>', {'conn': 1, id: id}, function(rsp){
+				$.pub( 'loading:stop' );
+				if (rsp.code == 0) {
+					currentId = id;
+					ssInfo();
+					ssStatus();
+				} else {
+					$.alert( rsp.msg );
+					location.reload( 1 );
+				}
+
+			});
+		});
+
+		$('body').delegate('.btn-conn-stop', 'click', function(e){
+			e.preventDefault();
+			var root = $(this).parents('tr'),
+				id = $(this).attr('data-id');
+			$.pub( 'loading:start' );
+			$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_switch")%>', {'conn': 0, id: id}, function(rsp){
+					$.pub( 'loading:stop' );
+				if (rsp.code == 0) {
+					currentId = id;
+					ssStatus();
+				} else {
+					$.alert( rsp.msg );
+					location.reload( 1 );
+				}
+
+			});
+		});
+
+		$('body').delegate('.btn-edit', 'click', function( e ){
+			e.preventDefault();
+			var that = this,
+				$this = $(that),
+				id = $this.attr('data-id'),
+				tpl = $('#tplsetss').html(),
+				tpldata = {
+					server_name: '',
+					password: '',
+					server: '',
+					server_port: '',
+					encrypt: 'rc4-md5'
+				};
+			$.pub( 'loading:start' );
+			$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_info")%>', {}, function(rsp){
+				if ( rsp.code == 0 ) {
+					$.pub( 'loading:stop' );
+					var list = rsp.list;
+					if ( list.length > 0 ) {
+						for (var i = 0; i < list.length; i++) {
+							 if ( list[i].id == id) {
+								tpldata.encrypt = list[i].method;
+								tpldata.server_name = StringH.encode4HtmlValue(list[i].server_name);
+								tpldata.password = StringH.encode4HtmlValue(list[i].password);
+								tpldata.server = StringH.encode4HtmlValue(list[i].server);
+								tpldata.server_port = StringH.encode4HtmlValue(list[i].server_port);
+								tpldata.id = list[i].id;
+							}
+						}
+					}
+					console.log( tpldata );
+					dlgform = $.dialog({
+						title: '<%:编辑服务%>',
+						width: 600,
+						content: tpl.tmpl(tpldata),
+						lock: true
+					});
+					setTimeout( function(){
+						$.selectBeautify();
+						$.formInit();
+					}, 100 );
+				}
+			});
+		});
+
+		$( 'body' ).delegate( '.btn-del', 'click', function( e ){
+			e.preventDefault();
+			var that = this,
+				$this = $(that),
+				id = $this.attr('data-id'),
+				ok = function(){
+					$.pub( 'loading:start' );
+					$.getJSON('<%=luci.dispatcher.build_url("api","yuneon","ss_del")%>', {id: id}, function( rsp ){
+						$.pub( 'loading:stop' );
+						if ( rsp.code == 0 ) {
+							ssInfo();
+							ssStatus();
+						} else {
+							$.alert( rsp.msg );
+						}
+					});
+				};
+			$.confirm( '<%:你确定要删除此项吗？%>', ok );
+		});
+	}
+
+	function ssSet(){
+		$('#btnadditem').on('click', function(e){
+			e.preventDefault();
+			var tpl = $('#tplsetss').html(),
+				tpldata = {
+					server_name: '',
+					password: '',
+					server: '',
+					server_port: '',
+					encrypt: 'rc4-md5'
+				};
+			dlgform = $.dialog({
+				title: '<%:添加服务%>',
+				width: 600,
+				content: tpl.tmpl(tpldata),
+				lock: true
+			});
+			setTimeout( function(){
+				$.selectBeautify();
+				$.formInit();
+			}, 100 );
+		});
+
+		$('body').delegate('#ss', 'submit', function(e){
+			e.preventDefault();
+			var url = this.action,
+				method = this.method,
+				param = $(this).serialize(),
+				formName = this.name,
+				validator = Valid.checkAll( this );
+			if (validator) {
+				$.pub( 'wait', {id: '#btnSave'});
+				$.ajax({
+					url: url,
+					type: method,
+					data: param,
+					dataType: 'json',
+					success: function(rsp){
+						var msg;
+						if (rsp.code == 0) {
+							dlgform.close();
+							location.reload( 1 );
+						}else{
+							$.alert(rsp.msg);
+						}
+						$.pub( 'done', {id: '#btnSave'});
+					}
+				});
+			}
+		});
+
+	}
+	
+	function ssImport(){
+		$( '#btnImport' ).on('click', function(e){
+			e.preventDefault();
+			var tpl = $( '#importform' ).html();
+			importform = $.dialog({
+				width: 390,
+				title: '<%:批量导入服务%>',
+				content: '<div class="mod-importflash">' + tpl + '</div>',
+				lock: true
+			});
+			setTimeout( function(){
+				$.selectBeautify();
+				$.formInit();
+			}, 100 );
+		});
+		
+		$( 'body' ).delegate( '#jsonfile', 'change', function( e ){
+			$( '#importFormBtn' ).on( 'enable', function( e, data ) {
+				if ( data.disabled ) {
+					this.className = 'btn btn-primary-disabled btn-block';
+					this.disabled = true;
+				} else {
+					this.className = 'btn btn-primary btn-block';
+					this.disabled = false;
+				}
+			});
+
+			var jsonfile = $( '#jsonfile' );
+			var err = $( '#importForm .t' );
+			var item = $( '#importForm .item' ).eq( 0 );
+			if ( jsonfile.val() == '' ) {
+				err.html( '<%:你未选择文件，请重新选择%>' ).show();
+				item.addClass( 'item-err' );
+				$( '#importFormBtn' ).prop('disabled', true);
+				return false;
+			}
+			var val = jsonfile.val();
+			var ext = val.substring( val.lastIndexOf( '.' ) + 1 );
+			ext = $.trim( ext );
+			var validExt = ext == 'json' || ext == 'JSON';
+			if ( !validExt ) {
+				err.html( '<%:文件格式错误，请重新选择%>' ).show();
+				item.addClass( 'item-err' );
+				$( '#importFormBtn' ).prop('disabled', true);
+				return false;
+			}
+				err.html( '' ).show();
+				item.addClass( 'item-err' );
+			$( '#importFormBtn' ).prop('disabled', false);
+		});
+		
+		function importfile(){
+			var jsonfile=$("#jsonfile").prop('files')[0];
+			var filereader = new FileReader();
+			var err = $( '#importForm .t' );
+			var item = $( '#importForm .item' ).eq( 0 );
+			var data;
+			if(typeof filereader == 'undefined'){
+				importform.close();
+				$.alert("您的浏览器不支持批量导入功能！");
+				return false;
+			}
+			filereader.readAsText(jsonfile);
+			filereader.onload = function() {
+				try {
+					data = $.parseJSON(this.result);
+				}
+				catch (e){
+					err.html( '<%:文件内容错误，请重新选择%>' ).show();
+					item.addClass( 'item-err' );
+					$( '#importFormBtn' ).prop('disabled', true);
+					return false;
+				}
+				err.hide();
+				item.removeClass( 'item-err' );
+				$('#importFormBtn').addClass('btn-primary-disabled').prop('disabled', true).find('span').text('<%:导入中...%>');
+				$.ajax({
+					url: '<%=luci.dispatcher.build_url("api", "yuneon", "ss_conf_import")%>',
+					type: 'POST',
+					dataType: 'json',
+					data: {data: JSON.stringify(data)},
+					success: function(res){
+						$('#importFormBtn').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:开始导入%>');
+						if(res.code == 0){
+							importform.close();
+							$.alert("导入成功！");
+							ssInfo();
+						}
+					}
+				});
+			};
+			filereader.onerror = function() {
+				$.alert("导入失败！");
+			};
+		}
+		
+		$( 'body' ).delegate( '#importFormBtn', 'click', function( e ){
+			e.preventDefault();
+			importfile();
+			return false;
+		});
+	}
+	
+	function showErrMsg( ele ){
+		var cont = $(ele).attr('data-error');
+		var tpl = $('#tmplErrtip').html();
+		var html = StringH.tmpl(tpl, {
+			cont: cont
+		});
+		$('.status-err-tips').remove();
+		$('body').append(html);
+		$('.status-err-tips').css({
+			left: $(ele).offset().left - $('.status-err-tips').width() / 2 + 20,
+			top: $(ele).offset().top + 28
+		});
+		$('body').click(function(e){
+			if( !$(e.target).is(".errmsg-wrap") ){
+				$('.status-err-tips').remove();
+			}
+		});
+	}
+
+	function ruleInfoGet(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_rule_info")%>', {}, function(rsp){
+			if( rsp.code == 0 ){
+				var tabs = $('#rulemode li');
+				var desc = $('#rulemodedesc p');
+				var conts = $('#rulemodecont > div');
+				if( rsp.info.ulistmode == 1 ){
+					tabs.removeClass('active').eq(0).addClass('active');
+					desc.hide().eq(0).show();
+				}
+				else{
+					tabs.removeClass('active').eq(1).addClass('active');
+					desc.hide().eq(1).show();
+				}
+				 conts.hide().eq(0).show();
+				var list = rsp.info.userlist;
+				var trarr = [];
+				var tpl = $('#tmplruleurl').html();
+				if($.isArray(list) && list.length > 0){
+					for(var i = 0, len = list.length; i < len; i++){
+						var tr = StringH.tmpl(tpl, {
+								url: list[i]
+						});
+								trarr.push(tr);
+					}
+					$('#ruledomainlTbody').html(trarr.join(''));
+				}
+				else{
+					$('#ruledomainlTbody').html('<tr><td colspan="2" style="text-align:center;"><%:还未添加域名%></td></tr>');
+				}
+				$.selectBeautify();
+			}else{
+				$.alert( rsp.msg );
+			}
+		});
+	}
+
+	function generalInfoGet(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_general_get")%>', {}, function(rsp){
+			if( rsp.code == 0 ){
+			tpldata = {
+				dnsmode: rsp.info.dnsmode,
+				localport: rsp.info.localport,
+				pacmode: rsp.info.pacmode,
+				cleandns: rsp.info.cleandns
+			};
+			tpl = $("#tmplgeneralinfo").html();
+			$("#generalinfo").html(tpl.tmpl(tpldata));
+			ruleDateGet();
+			$.selectBeautify();
+			$.formInit();
+			}else{
+				$.alert( rsp.msg );
+			}
+		});
+	}
+	
+	function generalInfoSet(){
+		var localport = $('#localport').val();
+		var dnsmode = $("#dnsmode").children('option:selected').val();
+		var pacmode = $("#pacmode").children('option:selected').val();
+		var cleandns = $("#cleandns").children('option:selected').val();
+		$('#generalbtnSave').addClass('btn-primary-disabled').prop('disabled', true).find('span').text('<%:应用中...%>');
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_general_set")%>', {'localport': localport, 'cleandns': cleandns, 'dnsmode': dnsmode, 'pacmode': pacmode}, function(rsp){
+			if( rsp.code == 0 ){
+				generalInfoGet();
+				ssStatus();
+				$('#generalbtnSave').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:保存并应用%>');
+			}else{
+				generalInfoGet();
+				ssStatus();
+				$('#generalbtnSave').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:保存并应用%>');
+				$.alert( rsp.msg );
+			}
+		});
+	}
+	
+	function ruleUpdate(){
+		if ($('#btnruleupdate').attr("state") == "off") { return false }
+		var pacmode = $("#pacmode").attr("disabled","true");
+		var pacmode = $("#pacmode").children('option:selected').val();
+		$('#btnruleupdate').attr("state", "off");
+		$('#btnruleupdate').css("cursor","default");
+		$('#btnruleupdate').css("color","black");
+		$('#ruledate').text('<%: 【最后更新：Updating...】%>');
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_rule_update")%>', {pacmode: pacmode}, function(rsp){
+			ruleDateGet();
+			$('#btnruleupdate').attr("state", "on");
+			$('#btnruleupdate').css("cursor","auto");
+			$('#btnruleupdate').css("color","green");
+			var pacmode = $("#pacmode").attr("disabled","false");
+		});
+	}
+	
+	function ruleDateGet(){
+		var pacmode = $("#pacmode").children('option:selected').val();
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_ruledate_get")%>', {pacmode: pacmode}, function(rsp){
+			if(pacmode == 2){
+				$('#btnruleupdate').hide();
+				$('#ruledate').hide();
+			}
+			else{
+				$('#btnruleupdate').show();
+				$('#ruledate').show();
+			}
+			$('#ruledate').text('【最后更新：' + rsp.date + '】');
+		});
+		
+	}
+	
+	function ruleSet(domain, mode, opt ){
+		$.pub( 'loading:start' );
+		$.ajax({
+			url: '<%=luci.dispatcher.build_url("api", "yuneon", "ss_rule_set")%>',
+			type: "post",
+			data: {'domain': domain, 'mode': mode, 'opt': opt},
+			dataType: 'json',
+			success: function(rsp){
+				$.pub( 'loading:stop' );
+				if (rsp.code == 0) {
+					ruleInfoGet();
+				}else{
+					$.alert(rsp.msg);
+				}
+			}
+		});
+	}
+	function addRule(){
+		$('#domainAddClose').on('click', function(e){
+			e.preventDefault();
+			addRuleurlDialog.close();
+		});
+		$('#domainAddSubmit').on('click', function(e){
+			e.preventDefault();
+			var mode = $('#rulemode li.active').attr('data-mode');
+			var validator = Valid.checkAll($('#adddomain')[0]);
+			if(validator){
+				var domain = $.trim( $('#domain').val() );
+				addRuleurlDialog.close();
+				ruleSet(domain, mode, 1);
+			}
+		});
+	}
+	function delRule( ele ){
+		var mode = $('#rulemode li.active').attr('data-mode');
+		var domain = $(ele).attr('data-domain');
+		ruleSet( domain, mode, 0 );
+	}
+	
+	function refreshping(){
+		timer = window.setInterval(function(){
+			if ( ajaxdone ) {
+				showping();
+			}
+		},500);
+	}
+	
+	function stoprefreshping(){
+		window.clearInterval(timer);
+	}
+	
+	function showping(){
+		ajaxdone = false;
+		var ping = -1;
+		stoprefreshping();
+		var cleandns = $("#cleandns").val();
+		var color = "green";
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_ping_get")%>', {'host': cleandns}, function(rsp){
+			ajaxdone = true;
+			if( rsp.code == 0 ){
+				ping = rsp.ping
+				if ( ping < 100){
+					color = "green";
+				}
+				if ( ping >= 100 && ping <500 ){
+					color = "orange";
+				}
+				if ( ping >= 500 ){
+					color = "red";
+				}
+				if ( ping <= 0 ){
+					color = "black";
+				}
+				
+				$('#dnsping').css("color",color);
+				$('#dnsping').html(Math.round(ping)+"ms");
+				
+				refreshping();
+			}else{
+				$.alert( rsp.msg );
+			}
+		});
+	}
+	
+	function deviceSwitch(){
+		var btn = $('#deviceswitch');
+		btn.on('click', function(e){
+			e.preventDefault();
+			$.pub( 'loading:start' );
+			$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_device_switch")%>', {}, function(rsp){
+				$.pub( 'loading:stop' );
+				if( rsp.code == 0 ){
+					deviceGet();
+				}else{
+					$.alert( rsp.msg );
+				}
+			});
+		});
+	}
+	function deviceGet(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ss_device_get")%>', {}, function(rsp){
+			if( rsp.code == 0 ){
+				if( rsp.info.enable == 1 ){
+					$('#deviceswitch')[0].className = 'btn-switch btn-switch-on';
+					$('#deviceoff').hide();
+					$('#deviceon').show();
+					var maclist = rsp.info.maclist;
+					var mnamelist = rsp.info.namelist;
+					var mtrarr = [];
+					var mtpl = $('#tmpldevicemac').html();
+					if( $.isArray(maclist) && maclist.length > 0 ){
+						for(var j = 0, l = maclist.length; j < l; j++){
+							var mtr = StringH.tmpl(mtpl, {
+								mac: maclist[j],
+								name: mnamelist[ maclist[j] ]
+							});
+							mtrarr.push(mtr);
+						}
+						$('#devicemacTbody').html(mtrarr.join(''));
+					}else{
+						$('#devicemacTbody').html('<tr><td colspan="3" style="text-align:center;"><%:还未添加设备%></td></tr>');
+					}
+				}else{
+					$('#deviceswitch')[0].className = 'btn-switch btn-switch-off';
+					$('#deviceoff').show();
+					$('#deviceon').hide();
+				}
+			}else{
+				$.alert( rsp.msg );
+			}
+		});
+	}
+	function addDeviceByDeviceList(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon","ss_mac_get")%>', {}, function(rsp){
+			if( rsp.code == 0 ){
+				var list = rsp.list;
+				var trarr = [];
+				var tpl = $('#tmplDevice').html();
+				if($.isArray(list) && list.length > 0){
+					for(var i = 0, len = list.length; i < len; i++){
+						var tr = StringH.tmpl(tpl, {
+							name: list[i].name,
+							status: list[i].online == 1 ? '<%:在线%>' : '<%:离线%>',
+							mac: list[i].mac
+						});
+						trarr.push(tr);
+					}
+					$('#dialogdeviceslist').html(trarr.join(''));
+					$('#listAddClose').on('click', function(e){
+						e.preventDefault();
+						devicelistDialog.close();
+					});
+					$('#listAddSubmit').on('click', function(e){
+						e.preventDefault();
+						var inputs = $('.deviceinput:checked');
+						var valarr = [];
+						if( inputs.length < 1 ){
+							alert("<%:请至少选择一个设备%>");
+						}else{
+							inputs.each(function (index, item) {
+								valarr.push( $.trim( item.value ) );
+							});
+							mac = valarr.join(',');
+							devicelistDialog.close();
+							setDeviceMac(mac, 0);
+						}
+					});
+				}else{
+					$('#dialogdeviceslist').html('<tr><td colspan="4" style="text-align:center;"><%:还没有设备连接进来%></td></tr>');
+				}
+			}
+		});
+	}
+	function addDeviceByMac(){
+		$('#macAddClose').on('click', function(e){
+			e.preventDefault();
+			addDevicemacDialog.close();
+		});
+		$('#macAddSubmit').on('click', function(e){
+			e.preventDefault();
+			var validator = Valid.checkAll($('#addbymac')[0]);
+			if(validator){
+				var mac = $.trim( $('#macaddr').val() );
+				addDevicemacDialog.close();
+				setDeviceMac(mac, 0);
+			}
+		});
+	}
+	function setDeviceMac( macs, opt ){
+	$.pub( 'loading:start' );
+		$.ajax({
+			url: '<%=luci.dispatcher.build_url("api", "yuneon", "ss_device_set")%>',
+			type: 'POST',
+			data: {'macs': macs, 'opt': opt},
+			dataType: 'json',
+			success: function(rsp){
+				$.pub( 'loading:stop' );
+				if( rsp.code == 0 ){
+					deviceGet();
+				}else{
+					$.alert( rsp.msg );
+				}
+			}
+		});
+	}
+	function delDevice( ele ){
+		var para = '';
+		para = $(ele).attr('data-macs');
+		setDeviceMac( para, 1 );
+	}
+	
+	function addEvent(){
+		$('body').delegate('#sslist .errmsg-wrap', 'click', function(){
+			showErrMsg( this )
+		});
+		$( '#rulemode li' ).on( 'click', function( e ){
+			e.preventDefault();
+			var checked = $( this ).hasClass( 'active' );
+			var mode = $( this ).attr('data-mode');
+			if ( !checked ) {
+				$.getJSON( '<%=luci.dispatcher.build_url("api", "yuneon", "ss_rule_switch")%>', { 'enable': 1, 'mode': mode }, function( rsp ){
+					if ( rsp.code === 0 ) {
+						ruleInfoGet();
+					} else {
+						$.alert( rsp.msg );
+					}
+				} );
+			}
+		} );
+		
+		$('body').delegate('#pacmode','change',function(){
+			ruleDateGet();
+		});
+		
+		$('#addruledomain').on('click', function(){
+			addRuleurlDialog = $.dialog({
+				title: '<%:添加域名%>',
+				content: $('#tmplAdddomain').html(),
+				lock: true,
+				width: 390,
+				initialize: function(){
+					addRule();
+				}
+			});
+		});
+		$('body').delegate('.rule-del', 'click', function(){
+			var self = this;
+			delRule(self);
+		});
+		$("body").delegate('#btnruleupdate', 'click', function(e){
+			e.preventDefault();
+			var self = this;
+			ruleUpdate(self);
+		});
+		$("body").delegate('#localport', 'active', function(e){
+			e.preventDefault();
+			var self = this;
+			$("#generalbtnSave").css("visibility","visible");
+		});
+		$("body").delegate('#generalbtnSave', 'click', function(e){
+			e.preventDefault();
+			generalInfoSet();
+		});
+		
+		$('#adddevicelist').on('click', function(){
+			devicelistDialog = $.dialog({
+				title: '<%:请选择需要使用SS的设备%>',
+				content: $('#tmplAddList').html(),
+				lock: true,
+				width: 600,
+				initialize: function(){
+					addDeviceByDeviceList();
+				}
+			});
+		});
+		$('#adddevicemac').on('click', function(){
+			addDevicemacDialog = $.dialog({
+				title: '<%:通过MAC地址添加要使用SS的设备%>',
+				content: $('#tmplAddmac').html(),
+				lock: true,
+				width: 390,
+				initialize: function(){
+					addDeviceByMac();
+				}
+			});
+		});
+		$('body').delegate('.device-del', 'click', function(){
+			var self = this;
+			delDevice( self );
+		});
+	}
+	return {
+		init : function(){
+			ssInfo();
+			ssImport();
+			ssStatus();
+			ssSet();
+			ssSwitch();
+			ruleInfoGet();
+			generalInfoGet();
+			deviceSwitch();
+			deviceGet();
+			addEvent();
+		}
+	}
+}());
+$(function(){
+	modelss.init();
+});
+</script>
+</body>
+</html>

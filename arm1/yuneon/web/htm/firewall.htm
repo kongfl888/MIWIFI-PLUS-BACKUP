@@ -1,0 +1,351 @@
+<%
+--[[
+	Info	端口控制
+]]--
+local ver = require("xiaoqiang.XQVersion").webVersion
+local XQLanWanUtil = require("xiaoqiang.util.XQLanWanUtil")
+local ip = XQLanWanUtil.getLanWanInfo("lan")["ipv4"][1]["ip"]
+%>
+<%include("web/inc/head")%>
+<title><%:小米路由器%></title>
+<meta name="viewport" content="width=1200">
+<link href="<%=resource%>/web/css/bc.css?v=<%=ver%>" rel="stylesheet">
+<link href="<%=resource%>/web/css/yuneon.css?v=<%=ver%>" rel="stylesheet">
+</head>
+<body>
+<div id="doc">
+	<%include("web/inc/header")%>
+	<div id="bd" data-ip="<%=ip%>">
+		<div class="mod-set mod-ngrok" id="modSetFW">
+			<div class="hd clearfix">
+				<h3><%:端口控制%></h3>
+			</div>
+			<div class="bd">
+				<div class="section">
+					<h4><%:端口列表：%></h4>
+					<table class="table">
+						<thead>
+							<tr>
+								<th style="width:200px;padding-right:20px"><%:名称%></th>
+								<th><%:协议%></th>
+								<th><%:端口%></th>
+								<th width="165" style="padding-left:15px;"><%:状态%></th>
+								<th width="156" class="center"><%:操作%></th>
+							</tr>
+						</thead>
+						<tbody id="serviceTbody">
+						</tbody>
+					</table>
+					<div class="addserver-contral">
+						<button id="btnAddServer" class="btn btn-dft btn-l"><span><%:添加端口%></span></button>
+					</div>
+				</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<%include("web/inc/footer")%>
+
+</div>
+<%include("web/inc/g.js")%>
+<script type="tmpl/html" id="tmplService">
+<tr data-service-id="{$id}" {if($enabled == 1)}data-enabled = "1"{/if}>
+	<td style="text-overflow:ellipsis;white-space:nowrap;padding-right:20px">{$name}</td>
+	<td>{$proto}</td>
+	<td>{$dest_port}</td>
+	<td class="con">{if($target == "ACCEPT")}<%:已开放%>&nbsp;&nbsp;|&nbsp;&nbsp;<a class="close" href="#"><%:关闭%></a>{else}<%:未开放%>&nbsp;&nbsp;|&nbsp;&nbsp;<a class="open" href="#"><%:打开%></a>{/if}</td>
+	<td><a href="#" class="btn btn-dft edit btn-s"><span><%:编辑%></span></a><a href="#" class="btn btn-dft del btn-s"><span><%:删除%></span></a></td>
+</tr>
+</script>
+<script type="tmpl/html" id="tmplSetServer">
+<div class="dialog-form-wrap">
+	<form action="<%=luci.dispatcher.build_url("api", "yuneon", "fw_server_set")%>" class="form form-fw" name="fwSet" id="fwSet">
+		{if($id && $id !='')}
+			<input type="hidden" name="id" value="{$id}">
+		{/if}
+		<div class="form-item">
+			<label class="k"><%:条目名称%></label>
+			<span class="v">
+				<input type="text" id="name" name="name" reqMsg="<%:条目名称%>" value="{$name}" class="ipt-text" />
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item-select">
+			<label class="k"><%:协议类型%></label>
+			<span class="v">
+				<select id="proto" class="beautify" name="proto" style="width:209px;">
+					<option value="tcp" {if($proto == 'tcp')}selected="selected"{/if}><%:TCP%></option>
+					<option value="udp" {if($proto == 'udp')}selected="selected"{/if}><%:UDP%></option>
+					<option value="tcpudp" {if($proto == 'tcpudp')}selected="selected"{/if}><%:TCP和UDP%></option>
+				</select>
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item">
+			<label class="k"><%:公网端口%></label>
+			<span class="v">
+				<input type="text" id="dest_port" name="dest_port" reqMsg="<%:公网端口%>" datatype="n-5" minValue="1" maxValue="65535" value="{$dest_port}" class="ipt-text" datatype="n" />
+			</span>
+			<em class="t"></em>
+		</div>
+		{if(!$id && $id =='')}
+		<div class="form-item-select">
+			<label class="k"><%:执行方式%></label>
+			<span class="v">
+				<select id="target" class="beautify" name="target" style="width:209px;">
+					<option value="ACCEPT" {if($target == 'ACCEPT')}selected="selected"{/if}><%:开放%></option>
+					<option value="DROP" {if($target == 'DROP')}selected="selected"{/if}><%:关闭%></option>
+				</select>
+				</select>
+			</span>
+			<em class="t"></em>
+		</div>
+		{else}
+			<input type="hidden" name="target" value="{$target}">
+		{/if}
+		<div class="form-contral">
+			<button type="submit" class="btn btn-primary btn-block" id="setServerSubmit"><span><%:确定%></span></button>
+		</div>
+	</form>
+</div>
+</script>
+<script type="tmpl/html" id="tmplErrtip">
+<div class="status-err-tips">
+	<span class="arrow"></span>
+	{$cont}
+</div>
+</script>
+<script>
+(function(){
+	var setDialog;
+	$.sub('fw:setServer', function(evt, data){
+		var validator = Valid.checkAll( $('#fwSet')[0] );
+		var param = $('#fwSet').serialize();
+		if( validator ){
+			$('#setServerSubmit').addClass('btn-primary-disabled').prop('disabled', true).find('span').text('<%:保存中...%>');
+			$.getJSON($('#fwSet').attr('action'), param, function(rsp){
+				 if(rsp.code == 0){
+					setDialog.close();
+					$.pub('fw:get');
+				 }
+				 else{
+					$('#setServerSubmit').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:编缉%>');
+					msg = rsp.msg;
+					$.alert(msg);
+				 }
+			});
+		}
+	});
+	$.sub('fw:delServer', function(evt, data){
+		var targetElement = data.targetElement;
+		var tr = $(targetElement).closest('tr');
+		var id = tr.attr('data-service-id');
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "fw_server_del")%>', {id: id}, function(rsp){
+			$.pub( 'loading:stop' );
+			if(rsp.code == 0){
+				$.pub('fw:get');
+			}else{
+				$.alert(rsp.msg);
+			}
+		});
+	});
+	$.sub('fw:openOne', function(evt, data){
+		var targetElement = data.targetElement;
+		var tr = $(targetElement).closest('tr');
+		var id = tr.attr('data-service-id');
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "fw_server_switch")%>', {id: id, target: "ACCEPT"}, function(rsp){
+			$.pub( 'loading:stop' );
+			if(rsp.code == 0){
+				$.pub('fw:get');
+			}else{
+				$.alert(rsp.msg);
+			}
+		});
+	});
+	$.sub('fw:closeOne', function(evt, data){
+		var targetElement = data.targetElement;
+		var tr = $(targetElement).closest('tr');
+		var id = tr.attr('data-service-id');
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "fw_server_switch")%>', {id: id, target: "DROP"}, function(rsp){
+			$.pub( 'loading:stop' );
+			if(rsp.code == 0){
+				$.pub('fw:get');
+			}else{
+				$.alert(rsp.msg);
+			}
+		});
+	});
+	$.sub('fw:get', function(evt, data){
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "fw_server_info")%>', {}, function(rsp){
+			$.pub( 'loading:stop' );
+			var tpl = $('#tmplService').html();
+			if(rsp.code == 0){
+				var list = rsp.list;
+				var trarr = [];
+				if($.isArray(list) && list.length > 0){
+					for(var i = 0, len = list.length; i < len; i++){
+						if(document.domain == "miwifi.com" || document.domain == $('#bd').data('ip') || (list[i].dest_port != '22' && list[i].dest_port != '8098')){
+						var tr = StringH.tmpl(tpl, {
+							id: list[i].id,
+							name: list[i].name,
+							proto: list[i].proto,
+							dest_port: list[i].dest_port,
+							target: list[i].target,
+						});
+						trarr.push(tr);
+						}
+					}
+					$('#serviceTbody').html(trarr.join(''));
+				}else{
+					$('#serviceTbody').html('<tr><td colspan="4" style="text-align:center;"><%:还没有条目添加进来%></td></tr>');
+				}
+			}
+		});
+	});
+	$.sub('fw:showSetDialog', function(evt, data){
+		var tpldata = {
+			id: '',
+			name: '',
+			proto: '',
+			dest_port: '',
+			target: ''
+		};
+		if (data.targetElement.id != "btnAddServer"){
+			var targetElement = data.targetElement;
+			var tr = $(targetElement).closest('tr');
+			var id = tr.attr('data-service-id');
+			$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "fw_server_get")%>', {id: id}, function(rsp){
+				if(rsp.code == 0){
+					tpldata = {
+						id: rsp.id,
+						name: rsp.name,
+						proto: rsp.proto,
+						dest_port: rsp.dest_port,
+						target: rsp.target
+					}
+					var editServerDialogHTML = StringH.tmpl($('#tmplSetServer').html(), tpldata);
+					setDialog = $.dialog({
+						title: '<%:编辑条目%>',
+						content: editServerDialogHTML,
+						lock: true,
+						padding: 0
+					});
+					setTimeout(function(){
+						$.selectBeautify();
+						$.formInit();
+					}, 100);
+				}
+				else{
+					$.alert(rsp.msg);
+				}
+			
+			});
+		}
+		else{
+			setDialog = $.dialog({
+				title: '<%:添加条目%>',
+				content: $('#tmplSetServer').html().tmpl(tpldata),
+				lock: true,
+				padding: 0
+			});
+			setTimeout(function(){
+				$.selectBeautify();
+				$.formInit();
+			}, 100);
+		}
+	});
+	$.sub('fw:applyAll', function(evt, data){
+		$('#btnApplyAll').addClass('btn-primary-disabled').prop('disabled', true).find('span').text('<%:应用中%>');
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "fw_apply_all")%>', {}, function(rsp){
+				if(rsp.code == 0){
+					$('#btnApplyAll').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:应用并生效%>');
+				}
+				else{
+					$.alert(rsp.msg);
+				}
+			
+			});
+	});
+	$.sub('fw:showHelp', function(evt, data){
+		$('#helpArrow').show();
+		$('#helpSection').show();
+	});
+	$.sub('fw:hideHelp', function(evt, data){
+		$('#helpArrow').hide();
+		$('#helpSection').hide();
+	});
+	$.sub('fw:showStatustip', function(evt, data){
+		var ele = data.targetElement;
+		var cont = $(ele).attr('data-error');
+		var tpl = $('#tmplErrtip').html();
+		var html = StringH.tmpl(tpl, {
+			cont: cont
+		});
+		$('.status-err-tips').remove();
+		$('body').append(html);
+		$('.status-err-tips').css({
+			left: $(ele).offset().left - $('.status-err-tips').width() / 2,
+			top: $(ele).offset().top + 28
+		});
+		$('body').click(function(){
+			$('.status-err-tips').remove();
+		});
+	});
+	$.sub('addEvent', function(evt, data){
+		$('.help .ico').on('click', function(){
+			$.pub('fw:showHelp');
+		});
+		$('.help-close').on('click', function(){
+			$.pub('fw:hideHelp');
+		});
+		$('body').delegate('#serviceTbody .err-ico', 'click', function(e){
+			e.stopPropagation();
+			$.pub('fw:showStatustip', {targetElement: this});
+		});
+		$('#btnAddServer').on('click', function(e){
+			e.preventDefault();
+			$.pub('fw:showSetDialog', {targetElement: this});
+		});
+		//edit click
+		$('body').delegate('#serviceTbody .edit', 'click', function(e){
+			e.preventDefault();
+			$.pub('fw:showSetDialog', {targetElement: this});
+		});
+		//del
+		$('body').delegate('#serviceTbody .del', 'click', function(e){
+			e.preventDefault();
+			$.pub('fw:delServer', {targetElement: this});
+		});
+		//edit submit
+		$('body').delegate('#fwSet', 'submit', function(e){
+			e.preventDefault();
+			$.pub('fw:setServer', {targetElement: this});
+		});
+		//open one server
+		$('body').delegate('#serviceTbody .open', 'click', function(e){
+			e.preventDefault();
+			$.pub('fw:openOne', {targetElement: this});
+		});
+		//close one server
+		$('body').delegate('#serviceTbody .close', 'click', function(e){
+			e.preventDefault();
+			$.pub('fw:closeOne', {targetElement: this});
+		});
+		$('body').delegate('#btnApplyAll', 'click', function(e){
+			e.preventDefault();
+			$.pub('fw:applyAll', {targetElement: this});
+		});
+	});
+})();
+$(function(){
+	$.pub('fw:get');
+	$.pub('addEvent');
+});
+</script>
+</body>
+</html>

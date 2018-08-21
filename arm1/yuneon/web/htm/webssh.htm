@@ -1,0 +1,85 @@
+<%
+--[[
+    Info    WEBSSH
+]]--
+%>
+<%include("web/inc/head")%>
+<title><%:小米路由器%></title>
+<meta name="viewport" content="width=1200">
+<link href="<%=resource%>/web/css/bc.css?v=<%=ver%>" rel="stylesheet">
+<link href="<%=resource%>/web/css/yuneon.css?v=<%=ver%>" rel="stylesheet">
+</head>
+<body>
+<div id="doc">
+    <%include("web/inc/header")%>
+    <div id="bd">
+        <div class="mod-set">
+            <div class="hd">
+                <h3><%:WEBSSH%></h3>
+				<div class="switch">
+                    <a href="#" id="wsswitch" class="btn-switch btn-switch-off"></a>
+                </div>
+            </div>
+            <div class="bd">
+				<div id="onoff" style="display:none;margin-top:45px"><span>WebShell未启用，开启后您可以在本页即时登录路由shell。<br/><br/>启用WebShell会对系统安全造成威胁，使用完请手动关闭！</span></div>
+				<iframe id="wsframe" style="border: 0px; min-height: 350px;width: 100%"></iframe>
+			</div>
+        </div>
+    </div>
+    <%include("web/inc/footer")%>
+</div>
+<%include("web/inc/g.js")%>
+<script>
+var ModelShellbox = (function(){
+	var wanIP = document.domain
+	function infoGet(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "webssh_info_get")%>', function(rsp){
+			if (rsp.code == 0) {
+				if (rsp.enable == 1){
+					$("#wsswitch")[0].className="btn-switch btn-switch-on"
+					$("#wsframe").attr("src", "http://"+wanIP+":4200")
+					$("#wsframe").show()
+					$("#onoff").hide()
+				}
+				else{
+					$("#wsswitch")[0].className="btn-switch btn-switch-off"
+					$("#wsframe").attr("src", "")
+					$("#wsframe").hide()
+					$("#onoff").show()
+				}
+			}
+		});
+	}
+	function switchSet(){
+		$.pub("loading:start");
+		$.getJSON("<%=luci.dispatcher.build_url("api", "yuneon", "webssh_switch_set")%>", function(rsp){
+			$.pub("loading:stop");
+			if (rsp.code == 0) {
+				infoGet();
+			}
+		});
+	}
+	
+	function eventsAdd(){
+		$("#wsswitch").on('click', function(e){
+			e.preventDefault();
+			switchSet();
+		});
+	}
+
+    return {
+        init: function(){
+			infoGet();
+			eventsAdd();
+        }
+    }
+}());
+$(function(){
+    ModelShellbox.init();
+});
+</script>
+
+<script type="text/javascript">  
+</script>
+</body>
+</html>

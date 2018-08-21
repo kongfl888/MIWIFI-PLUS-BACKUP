@@ -1,0 +1,438 @@
+<%
+--[[
+	Info	路由器NGROK设置
+]]--
+local ver = require("xiaoqiang.XQVersion").webVersion
+local XQLanWanUtil = require("xiaoqiang.util.XQLanWanUtil")
+local ip = XQLanWanUtil.getLanWanInfo("lan")["ipv4"][1]["ip"]
+%>
+<%include("web/inc/head")%>
+<title><%:小米路由器%></title>
+<meta name="viewport" content="width=1200">
+<link href="<%=resource%>/web/css/bc.css?v=<%=ver%>" rel="stylesheet">
+<link href="<%=resource%>/web/css/yuneon.css?v=<%=ver%>" rel="stylesheet">
+</head>
+<body>
+<div id="doc">
+	<%include("web/inc/header")%>
+	<div id="bd" data-ip=<%=ip%>>
+		<div class="mod-set mod-ngrok" id="modSetNGROK">
+			<div class="hd clearfix">
+				<div class="help">
+					<span class="ico"></span>
+					<span class="arrow-wrap" id="helpArrow">
+						<span class="arrow1"></span>
+						<span class="arrow2"></span>
+					</span>
+				</div>
+				<h3><%:NGROK%></h3>
+			</div>
+			<div class="bd">
+				<div class="section section-help" id="helpSection">
+					<div class="help-cont">
+						<span class="help-close"></span>
+						<div class="what">
+							<h3><%:什么是内网穿透？%></h3>
+							<p><%:所谓内网就是内部建立的局域网络或办公网络。%></p>
+							<p><%:内网穿透即NAT穿透，网络连接时术语，计算机是局域网内时，外网与内网的计算机节点需要连接通信，有时就会出现不支持内网穿透。%></p>
+							<p><%:就是说映射端口,能让外网的电脑找到处于内网的电脑,提高下载速度。%></p>
+							<p><%:不管是内网穿透还是其他类型的网络穿透，都是网络穿透的统一方法来研究和解决。%></p>
+						</div>
+						<div class="qa">
+							<h3><%:常见问题%></h3>
+							<h4><%:如何设置NGROK？%></h4>
+							<p><%:1. 申请一个顶级域名，推荐.pw域名，2元一年；%></p>
+							<p><%:2. 将要映射的二级域名（比如web.yuneon.pw）的cname记录指向服务器名，如server.ngrok.cc；%></p>
+							<p><%:3. 添加服务，选择待映射的协议，并输入待映射的内网地址和端口号。%></p>
+							<p><%:4. 映射tcp协议时，会要求指定外网端口号%>
+							<h4><%:注意事项%>:</h4>
+							<p><%:服务器地址供多个可选，个别服务器可能须已备案域名；%></p>
+							<p><%:修改服务器后请将自己的域名cname也指向修改后的服务器，依ttl不同，dns生效时间长短不一。%></p>
+							<p><%:如果出现错误，请尝试刷新页面，然后重启服务；%></p>
+							<p><%:tcp映射如出现错误，很大可能是外网端口被占用，请修改%></p>
+							<p><%:可同时开启多个NGROK服务。%></p>
+						</div>
+					</div>
+				</div>
+				<div class="section">
+					<h4><%:服务列表：%></h4>
+					<table class="table">
+						<thead>
+							<tr>
+								<th><%:服务名%></th>
+								<th><%:域名%></th>
+								<th><%:内网地址%></th>
+								<th width="165" style="padding-left:15px;"><%:状态%></th>
+								<th width="156" class="center"><%:操作%></th>
+							</tr>
+						</thead>
+						<tbody id="serviceTbody">
+						</tbody>
+					</table>
+					<div class="addserver-contral">
+						<a href="#" id="btnAddServer" class="btn btn-dft btn-l"><span><%:添加服务%></span></a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<%include("web/inc/footer")%>
+
+</div>
+<%include("web/inc/g.js")%>
+<script type="tmpl/html" id="tmplService">
+<tr data-service-id="{$id}" {if($enabled == 1)}data-enabled = "1"{/if}>
+	<td>{$sname}</td>
+	<td>{$hostname}</td>
+	<td class="con">{$lhost}:{$lport}</td>
+	<td class="con">{if($enabled == 1)}<%:已启用%>&nbsp;&nbsp;|&nbsp;&nbsp;<a class="close" href="#"><%:停用%></a>{else}<%:未启用%>&nbsp;&nbsp;|&nbsp;&nbsp;<a class="open" href="#"><%:启用%></a>{/if}<br/>{if($status == 0)}<span><%:连接关闭%></span>{elseif($status == 1)}<span class="status-ok"><%:连接正常%></span>{else}<span class="status-err"><%:连接错误%></span><span class="err-ico" data-error="<%:可能是服务未启动，或者TCP远程公网端口被占用%>"></span>{/if}</td>
+	<td><a href="#" class="btn btn-dft edit btn-s"><span><%:编辑%></span></a><a href="#" class="btn btn-dft del btn-s"><span><%:删除%></span></a></td>
+</tr>
+</script>
+<script type="tmpl/html" id="tmplSetServer">
+<div class="dialog-form-wrap">
+	<form action="<%=luci.dispatcher.build_url("api", "yuneon", "ngrok_server_set")%>" class="form form-ngrok" name="ngrokSet" id="ngrokSet">
+		{if($id && $id !='')}
+			<input type="hidden" name="id" value="{$id}">
+		{/if}
+		<input type="hidden" name="enabled" value="{$enabled}">
+		<div class="form-item">
+			<label class="k"><%:服务名称%></label>
+			<span class="v">
+				<input type="text" id="sname" name="sname" reqMsg="<%:服务名称%>" value="{$sname}" class="ipt-text" />
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item-select">
+			<label class="k"><%:服务器%></label>
+			<span class="v">
+				<select id="shost" class="beautify" name="shost" style="width:260px;">
+					<option value="ittun.com:44433" {if($shost == 'ittun.com:44433')}selected="selected"{/if}><%:ittun.com%></option>
+					<option value="server.ngrok.cc:4443" {if($shost == 'server.ngrok.cc:4443')}selected="selected"{/if}><%:server.ngrok.cc%></option>
+					<option value="tunnel.phpor.me:4443" {if($shost == 'tunnel.phpor.me:4443')}selected="selected"{/if}><%:tunnel.phpor.me%></option>
+					<option value="ngrok.veelove.cn:443" {if($shost == 'ngrok.veelove.cn:443')}selected="selected"{/if}><%:ngrok.veelove.cn%></option>
+					<option value="tunnel.echomod.cn:4443" {if($shost == 'tunnel.echomod.cn:4443')}selected="selected"{/if}><%:tunnel.echomod.cn%></option>
+					<option value="tunnel.qydev.com:4443" {if($shost == 'tunnel.qydev.com:4443')}selected="selected"{/if}><%:tunnel.qydev.com%></option>
+				</select>
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item-select">
+			<label class="k"><%:协议类型%></label>
+			<span class="v">
+				<select id="proto" class="beautify" name="proto" style="width:209px;">
+					<option value="1" {if($proto == '1')}selected="selected"{/if}><%:HTTP%></option>
+					<option value="2" {if($proto == '2')}selected="selected"{/if}><%:HTTPS%></option>
+					<option value="3" {if($proto == '3')}selected="selected"{/if}><%:TCP%></option>
+				</select>
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item form-item-input input-ip" name="portForm">
+			<label class="k" for="ip" ><%:内网IP地址：%><span class="iphere"></span></label>
+			<span class="v">
+				<input type="text" id="lhost" name="lhost" reqMsg="<%:内网地址末位%>" datatype="n-3" minValue="1" maxValue="254"  value="{$lhost}" class="ipt-text no-init" />
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item">
+			<label class="k"><%:内网端口%></label>
+			<span class="v">
+				<input type="text" id="lport" name="lport" reqMsg="<%:内网端口%>" datatype="n-5" minValue="1" maxValue="65535" value="{$lport}" class="ipt-text" datatype="n" />
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item">
+			<label class="k"><%:指向域名%></label>
+			<span class="v">
+				<input type="text" id="hostname" name="hostname" reqMsg="<%:指向域名%>" datatype="reg-/^[a-zA-Z0-9][a-zA-Z0-9\-]*[\.]([a-zA-Z0-9][a-zA-Z0-9\-]*[\.])*[a-zA-Z]+$/" value="{$hostname}" class="ipt-text" />
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-item" id="rportbd" style="display:none">
+			<label class="k"><%:定制端口%></label>
+			<span class="v">
+				<input type="text" id="rport" name="rport" reqMsg="<%:定制端口%>" datatype="n-5" minValue="1" maxValue="65535" value="{$rport}" class="ipt-text" datatype="n" />
+			</span>
+			<em class="t"></em>
+		</div>
+		<div class="form-contral">
+			<button type="submit" class="btn btn-primary btn-block" id="setServerSubmit"><span><%:确定%></span></button>
+		</div>
+	</form>
+</div>
+</script>
+<script type="tmpl/html" id="tmplErrtip">
+<div class="status-err-tips">
+	<span class="arrow"></span>
+	{$cont}
+</div>
+</script>
+<script>
+(function(){
+	var setDialog;
+	$.sub('ngrok:setServer', function(evt, data){
+		var validator = Valid.checkAll( $('#ngrokSet')[0] );
+		var param = $('#ngrokSet').serialize()
+		var ip = $('.iphere').text() + $('input[name="lhost"]').val();
+		param = param.replace(/lhost=\d{1,3}/, 'lhost=' + ip);
+		if( validator ){
+			$('#setServerSubmit').addClass('btn-primary-disabled').prop('disabled', true).find('span').text('<%:保存中...%>');
+			$.getJSON($('#ngrokSet').attr('action'), param, function(rsp){
+				 if(rsp.code == 0){
+					setDialog.close();
+					$.pub('ngrok:get');
+				 }
+				 else{
+					$('#setServerSubmit').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:编缉%>');
+					msg = rsp.msg;
+					$.alert(msg);
+				 }
+			});
+		}
+	});
+	$.sub('ngrok:delServer', function(evt, data){
+		var targetElement = data.targetElement;
+		var tr = $(targetElement).closest('tr');
+		var id = tr.attr('data-service-id');
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ngrok_server_del")%>', {id: id}, function(rsp){
+			$.pub( 'loading:stop' );
+			if(rsp.code == 0){
+				$.pub('ngrok:get');
+			}else{
+				$.alert(rsp.msg);
+			}
+		});
+	});
+	$.sub('ngrok:openOne', function(evt, data){
+		var targetElement = data.targetElement;
+		var tr = $(targetElement).closest('tr');
+		var id = tr.attr('data-service-id');
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ngrok_server_switch")%>', {id: id, on: 1}, function(rsp){
+			$.pub( 'loading:stop' );
+			if(rsp.code == 0){
+				$.pub('ngrok:get');
+			}else{
+				$.alert(rsp.msg);
+			}
+		});
+	});
+	$.sub('ngrok:closeOne', function(evt, data){
+		var targetElement = data.targetElement;
+		var tr = $(targetElement).closest('tr');
+		var id = tr.attr('data-service-id');
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ngrok_server_switch")%>', {id: id, on: 0}, function(rsp){
+			$.pub( 'loading:stop' );
+			if(rsp.code == 0){
+				$.pub('ngrok:get');
+			}else{
+				$.alert(rsp.msg);
+			}
+		});
+	});
+	$.sub('ngrok:get', function(evt, data){
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ngrok_server_info")%>', {}, function(rsp){
+			$.pub( 'loading:stop' );
+			var tpl = $('#tmplService').html();
+			if(rsp.code == 0){
+				var list = rsp.list;
+				var trarr = [];
+				if( rsp.flag == 1 ){
+					$.pub('ngrok:showHelp');
+				}
+				if($.isArray(list) && list.length > 0){
+					for(var i = 0, len = list.length; i < len; i++){
+						var tr = StringH.tmpl(tpl, {
+							id: list[i].id,
+							sname: list[i].sname,
+							proto: list[i].proto,
+							lhost: list[i].lhost,
+							shost: list[i].shost,
+							lport: list[i].lport,
+							hostname: list[i].hostname,
+							rport: list[i].rport,
+							enabled: list[i].enabled,
+							status: list[i].status
+						});
+						trarr.push(tr);
+					}
+					$('#serviceTbody').html(trarr.join(''));
+				}else{
+					$('#serviceTbody').html('<tr><td colspan="4" style="text-align:center;"><%:还没有服务添加进来%></td></tr>');
+				}
+			}
+		});
+	});
+	$.sub('ngrok:showSetDialog', function(evt, data){
+		var ip = $('#bd').data('ip');
+		var iparr = ip.split('.');
+		iparr.pop();
+		var ipprefix = iparr.join('.') + '.';
+		var tpldata = {
+			id: '',
+			sname: '',
+			proto: '',
+			lhost: '',
+			shost: '',
+			lport: '',
+			hostname: '',
+			rport: '',
+			enabled: 1,
+		};
+		if (data.targetElement.id != "btnAddServer"){
+			var targetElement = data.targetElement;
+			var tr = $(targetElement).closest('tr');
+			var id = tr.attr('data-service-id');
+			$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "ngrok_server_get")%>', {id: id}, function(rsp){
+				if(rsp.code == 0){
+					tpldata = {
+						id: rsp.id,
+						sname: rsp.sname,
+						proto: rsp.proto,
+						lhost: rsp.lhost,
+						shost: rsp.shost,
+						lport: rsp.lport,
+						hostname: rsp.hostname,
+						rport: rsp.rport,
+						enabled: rsp.enabled
+					}
+					var editServerDialogHTML = StringH.tmpl($('#tmplSetServer').html(), tpldata);
+					setDialog = $.dialog({
+						title: '<%:编辑服务%>',
+						content: editServerDialogHTML,
+						initialize: function() {
+							if (tpldata.proto == 3){
+								$('#rportbd').show();
+							}
+							$.selectBeautify();
+							$.formInit();
+							$('.iphere').text(ipprefix);
+							var ip = $('input[name="lhost"]').val();
+							$('input[name="lhost"]').val(ip.split('.')[3]);
+						},
+						lock: true,
+						padding: 0
+					});
+					setTimeout(function(){
+						$.selectBeautify();
+						$.formInit();
+					}, 100);
+				}
+				else{
+					$.alert(rsp.msg);
+				}
+			
+			});
+		}
+		else{
+			setDialog = $.dialog({
+				title: '<%:添加服务%>',
+				content: $('#tmplSetServer').html().tmpl(tpldata),
+				initialize: function() {
+					$.selectBeautify();
+					$.formInit();
+					$('.iphere').text(ipprefix);
+					var ip = $('input[name="lhost"]').val();
+					$('input[name="lhost"]').val(ip.split('.')[3]);
+				},
+				lock: true,
+				padding: 0
+			});
+			setTimeout(function(){
+				$.selectBeautify();
+				$.formInit();
+			}, 100);
+		}
+	});
+	$.sub('ngrok:showRportInput', function(evt, data){
+		var proto = data.targetElement.id;
+		if ($('#'+proto).children('option:selected').val() == 3){
+			$('#rportbd').show();
+		}
+		else{
+			$('#rportbd').hide();
+		}
+	});
+	$.sub('ngrok:showHelp', function(evt, data){
+		$('#helpArrow').show();
+		$('#helpSection').show();
+	});
+	$.sub('ngrok:hideHelp', function(evt, data){
+		$('#helpArrow').hide();
+		$('#helpSection').hide();
+	});
+	$.sub('ngrok:showStatustip', function(evt, data){
+		var ele = data.targetElement;
+		var cont = $(ele).attr('data-error');
+		var tpl = $('#tmplErrtip').html();
+		var html = StringH.tmpl(tpl, {
+			cont: cont
+		});
+		$('.status-err-tips').remove();
+		$('body').append(html);
+		$('.status-err-tips').css({
+			left: $(ele).offset().left - $('.status-err-tips').width() / 2,
+			top: $(ele).offset().top + 28
+		});
+		$('body').click(function(){
+			$('.status-err-tips').remove();
+		});
+	});
+	$.sub('addEvent', function(evt, data){
+		$('.help .ico').on('click', function(){
+			$.pub('ngrok:showHelp');
+		});
+		$('.help-close').on('click', function(){
+			$.pub('ngrok:hideHelp');
+		});
+		$('body').delegate('#serviceTbody .err-ico', 'click', function(e){
+			e.stopPropagation();
+			$.pub('ngrok:showStatustip', {targetElement: this});
+		});
+		$('#btnAddServer').on('click', function(e){
+			e.preventDefault();
+			$.pub('ngrok:showSetDialog', {targetElement: this});
+		});
+		//edit click
+		$('body').delegate('#serviceTbody .edit', 'click', function(e){
+			e.preventDefault();
+			$.pub('ngrok:showSetDialog', {targetElement: this});
+		});
+		$('body').delegate('#proto', 'change', function(e){
+			e.preventDefault();
+			$.pub('ngrok:showRportInput', {targetElement: this});
+		});
+		//del
+		$('body').delegate('#serviceTbody .del', 'click', function(e){
+			e.preventDefault();
+			$.pub('ngrok:delServer', {targetElement: this});
+		});
+		//edit submit
+		$('body').delegate('#ngrokSet', 'submit', function(e){
+			e.preventDefault();
+			$.pub('ngrok:setServer', {targetElement: this});
+		});
+		//open one server
+		$('body').delegate('#serviceTbody .open', 'click', function(e){
+			e.preventDefault();
+			$.pub('ngrok:openOne', {targetElement: this});
+		});
+		//close one server
+		$('body').delegate('#serviceTbody .close', 'click', function(e){
+			e.preventDefault();
+			$.pub('ngrok:closeOne', {targetElement: this});
+		});
+	});
+})();
+$(function(){
+	$.pub('ngrok:get');
+	$.pub('addEvent');
+});
+</script>
+</body>
+</html>

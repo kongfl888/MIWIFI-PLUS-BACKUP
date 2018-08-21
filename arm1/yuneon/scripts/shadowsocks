@@ -1,0 +1,294 @@
+#!/bin/sh /etc/rc.common 
+. /lib/functions.sh
+
+START=99
+STOP=
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+config_load "yuneon"
+config_get MIWIFIPATH miwifiplus path
+config_get ENABLED shadowsocks enabled
+config_get LOCALPORT shadowsocks local_port
+config_get SERVER_ID shadowsocks server_id
+config_get PACMODE shadowsocks pac_mode
+config_get DNSMODE shadowsocks dns_mode
+config_get CLEANDNS shadowsocks clean_dns
+config_get DEVICEMODE shadowsocks dev_enable
+config_get ALLOWMACS shadowsocks mac
+config_load "shadowsocks"
+config_get SERVER $SERVER_ID server
+config_get SERVERPORT $SERVER_ID server_port
+config_get PASSWORD $SERVER_ID password
+config_get METHOD $SERVER_ID method
+
+[ -z "$SERVER" ] || SERVERIP=`ping $SERVER -c 1 | sed '1{s/[^(]*(//;s/).*//;q}'`
+WANIP=`ubus call network.interface.wan status | grep \"address\" | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'`
+DNSIP1=`ubus call network.interface.wan status|jason.sh -b|grep '"dns-server",0'|grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'`
+DNSIP2=`ubus call network.interface.wan status|jason.sh -b|grep '"dns-server",1'|grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'`
+DNSPORT=53
+[ $(echo $CLEANDNS | grep -Ec "208.67|8.20|8.26") -ge 1 ] && DNSPORT=443
+
+IPSETFILE_PATH="$MIWIFIPATH/ipset"
+CONFIG_FILE="/etc/shadowsocks.json"
+
+createRuleIpset()
+{
+	## Create new ipset
+	[ $(ipset list ss_user_dst_forward 2>/dev/null|wc -l) -gt 0 ] || ipset -N ss_user_dst_forward nethash
+	ipset restore -f $IPSETFILE_PATH/game_list.conf
+	
+	[ $(ipset list ss_user_dst_drop 2>/dev/null|wc -l) -gt 0 ] || ipset -N ss_user_dst_drop nethash
+	
+	[ $(ipset list ss_out_dst_forward 2>/dev/null|wc -l) -gt 0 ] || ipset -N ss_out_dst_forward iphash
+	
+	[ $(ipset list ss_lan_dst_drop 2>/dev/null|wc -l) -gt 0 ] || {
+		ipset -N ss_lan_dst_drop nethash
+		ipset add ss_lan_dst_drop 0.0.0.0/8
+		ipset add ss_lan_dst_drop 10.0.0.0/8
+		ipset add ss_lan_dst_drop 100.64.0.0/10
+		ipset add ss_lan_dst_drop 127.0.0.0/8
+		ipset add ss_lan_dst_drop 169.254.0.0/16
+		ipset add ss_lan_dst_drop 172.16.0.0/12
+		ipset add ss_lan_dst_drop 192.0.0.0/24
+		ipset add ss_lan_dst_drop 192.0.2.0/24
+		ipset add ss_lan_dst_drop 192.25.61.0/24
+		ipset add ss_lan_dst_drop 192.31.196.0/24
+		ipset add ss_lan_dst_drop 192.52.193.0/24
+		ipset add ss_lan_dst_drop 192.88.99.0/24
+		ipset add ss_lan_dst_drop 192.168.0.0/16
+		ipset add ss_lan_dst_drop 192.175.48.0/24
+		ipset add ss_lan_dst_drop 198.18.0.0/15
+		ipset add ss_lan_dst_drop 198.51.100.0/24
+		ipset add ss_lan_dst_drop 203.0.113.0/24
+		ipset add ss_lan_dst_drop 224.0.0.0/4
+		ipset add ss_lan_dst_drop 240.0.0.0/4
+		ipset add ss_lan_dst_drop 255.255.255.255
+		ipset add ss_lan_dst_drop 110.110.110.110
+		ipset add ss_lan_dst_drop 100.100.100.100
+		ipset add ss_lan_dst_drop 188.188.188.188
+		ipset add ss_lan_dst_drop $SERVERIP
+		ipset add ss_lan_dst_drop $WANIP
+		ipset add ss_lan_dst_drop $DNSIP1
+		ipset add ss_lan_dst_drop $DNSIP2
+	}
+	
+	[ $(ipset list ss_out_src_forward 2>/dev/null|wc -l) -gt 0 ] || {
+		ipset -N ss_out_src_forward iphash
+		ipset add ss_out_src_forward 127.0.0.1
+		ipset add ss_out_src_forward 192.168.31.1
+		ipset add ss_out_src_forward $WANIP
+	}
+	
+	[ $DNSMODE -eq 0 ] && ipset add ss_out_dst_forward $CLEANDNS
+}
+
+destroyRuleIpset()
+{
+	[ $(ipset list ss_lan_dst_drop 2>/dev/null|wc -l) -gt 0 ] && ipset destroy ss_lan_dst_drop
+	[ $(ipset list ss_out_src_forward 2>/dev/null|wc -l) -gt 0 ] && ipset destroy ss_out_src_forward
+	[ $(ipset list ss_out_dst_forward 2>/dev/null|wc -l) -gt 0 ] && ipset destroy ss_out_dst_forward
+	[ $(ipset list ss_user_dst_forward 2>/dev/null|wc -l) -gt 0 ] && ipset destroy ss_user_dst_forward
+	[ $(ipset list ss_user_dst_drop 2>/dev/null|wc -l) -gt 0 ] && ipset destroy ss_user_dst_drop
+	[ $(ipset list gfw_list 2>/dev/null|wc -l) -gt 0 ] && ipset destroy gfw_list
+	[ $(ipset list cn_list 2>/dev/null|wc -l) -gt 0 ] && ipset destroy cn_list
+}
+
+createRuleFile(){
+	[ $(ls $IPSETFILE_PATH|grep -c ss_user_dst_forward.conf) -eq 0 ] && touch $IPSETFILE_PATH/ss_user_dst_forward.conf
+	[ $(ls $IPSETFILE_PATH|grep -c ss_user_dst_drop.conf) -eq 0 ] && touch $IPSETFILE_PATH/ss_user_dst_drop.conf
+	[ $(ls $IPSETFILE_PATH|grep -c ss_user_dns_list.conf) -eq 0 ] && touch $IPSETFILE_PATH/ss_user_dns_list.conf
+	ln -sf $IPSETFILE_PATH/ss_user_dst_forward.conf /etc/dnsmasq.d/ss_user_dst_forward.conf
+	ln -sf $IPSETFILE_PATH/ss_user_dst_drop.conf /etc/dnsmasq.d/ss_user_dst_drop.conf
+	
+	[ $DNSMODE -ne 2 ] && {
+		ln -sf $IPSETFILE_PATH/dns_list.conf /etc/dnsmasq.d/dns_list.conf
+		ln -sf $IPSETFILE_PATH/ss_user_dns_list.conf /etc/dnsmasq.d/ss_user_dns_list.conf
+	}
+	
+	[ $(ls $IPSETFILE_PATH|grep -c gfw_list.conf) -eq 0 ] && {
+		$MIWIFIPATH/scripts/update_gfwlist
+		while [ $? -eq 1 ]
+		do
+			$MIWIFIPATH/scripts/update_gfwlist
+		done
+	}
+	[ $(ls $IPSETFILE_PATH|grep -c cn_list.conf) -eq 0 ] && {
+		$MIWIFIPATH/scripts/update_cnlist
+		while [ $? -eq 1 ]
+		do
+			$MIWIFIPATH/scripts/update_cnlist
+		done
+	}
+	
+	echo "ipset=/.google.com/ss_out_dst_forward" > /etc/dnsmasq.d/ss_out_dst_forward.conf
+}
+
+destroyRuleFile(){
+	[ -z /etc/dnsmasq.d/gfw_list.conf ] || rm -rf /etc/dnsmasq.d/gfw_list.conf
+	[ -z /tmp/etc/dnsmasq.d/gfw_list.conf ] || rm -rf /tmp/etc/dnsmasq.d/gfw_list.conf
+	[ -z /etc/dnsmasq.d/ss_user_dst_forward.conf ] || rm -rf /etc/dnsmasq.d/ss_user_dst_forward.conf
+	[ -z /tmp/etc/dnsmasq.d/ss_user_dst_forward.conf ] || rm -rf /tmp/etc/dnsmasq.d/ss_user_dst_forward.conf
+	[ -z /etc/dnsmasq.d/ss_user_dst_drop.conf ] || rm -rf /etc/dnsmasq.d/ss_user_dst_drop.conf
+	[ -z /tmp/etc/dnsmasq.d/ss_user_dst_drop.conf ] || rm -rf /tmp/etc/dnsmasq.d/ss_user_dst_drop.conf
+	[ -z /etc/dnsmasq.d/ss_out_dst_forward.conf ] || rm -rf /etc/dnsmasq.d/ss_out_dst_forward.conf
+	[ -z /tmp/etc/dnsmasq.d/ss_out_dst_forward.conf ] || rm -rf /tmp/etc/dnsmasq.d/ss_out_dst_forward.conf
+	[ -z /etc/dnsmasq.d/dns_list.conf ] || rm -rf /etc/dnsmasq.d/dns_list.conf
+	[ -z /tmp/etc/dnsmasq.d/dns_list.conf ] || rm -rf /tmp/etc/dnsmasq.d/dns_list.conf
+	[ -z /etc/dnsmasq.d/ss_user_dns_list.conf ] || rm -rf /etc/dnsmasq.d/ss_user_dns_list.conf
+	[ -z /tmp/etc/dnsmasq.d/ss_user_dns_list.conf ] || rm -rf /tmp/etc/dnsmasq.d/ss_user_dns_list.conf
+}
+
+createRuleTable()
+{
+	[ $(iptables -t nat -L|grep -c 'Chain SS_RULE_FORWARD') -gt 0 ] || iptables -t nat -N SS_RULE_FORWARD
+	iptables -t nat -A SS_RULE_FORWARD -m set --match-set ss_lan_dst_drop dst -j RETURN
+	iptables -t nat -A SS_RULE_FORWARD -p tcp -m set --match-set ss_user_dst_forward dst -j REDIRECT --to-port $LOCALPORT
+	iptables -t nat -A SS_RULE_FORWARD -m set --match-set ss_user_dst_drop dst -j RETURN
+	case $PACMODE in
+	0 )
+		[ $(ipset list gfw_list 2>/dev/null|wc -l) -gt 0 ] || ipset -N gfw_list iphash
+		ln -sf $IPSETFILE_PATH/gfw_list.conf /etc/dnsmasq.d/gfw_list.conf
+		iptables -t nat -A SS_RULE_FORWARD -p tcp -m set --match-set gfw_list dst -j REDIRECT --to-port $LOCALPORT
+	;;
+	1 )
+		[ $(ipset list cn_list 2>/dev/null|wc -l) -gt 0 ] || ipset -N cn_list nethash
+		ipset restore -f $IPSETFILE_PATH/cn_list.conf
+		iptables -t nat -A SS_RULE_FORWARD -p tcp -m set ! --match-set cn_list dst -j REDIRECT --to-port $LOCALPORT
+	;;
+	2 )
+		iptables -t nat -A SS_RULE_FORWARD -p tcp -j REDIRECT --to-port $LOCALPORT
+	;;
+	esac
+	
+	[ $(iptables -t nat -L|grep -c 'Chain SS_RULE_ENTRY') -gt 0 ] || iptables -t nat -N SS_RULE_ENTRY
+	if [ $DEVICEMODE -eq 1 ]
+	then
+		for mac in $ALLOWMACS
+		do
+			iptables -t nat -A SS_RULE_ENTRY -p tcp -m mac --mac-source $mac -j SS_RULE_FORWARD
+		done
+	else
+		iptables -t nat -A SS_RULE_ENTRY -p tcp -j SS_RULE_FORWARD
+	fi
+		
+	local iptablenum=$(iptables -t nat -L PREROUTING --line-number|grep AD_RULE_ENTRY|cut -d " " -f1)
+	if [ -z "$iptablenum" ]
+	then
+		iptables -t nat -A PREROUTING -p tcp -j SS_RULE_ENTRY
+	else
+		iptables -t nat -I PREROUTING $iptablenum -p tcp -j SS_RULE_ENTRY
+	fi
+	
+	iptables -t nat -A OUTPUT -p tcp -m set --match-set ss_out_src_forward src -m set --match-set ss_out_dst_forward dst -j REDIRECT --to-port $LOCALPORT
+}
+
+destroyRuleTable()
+{
+	while [ $(iptables -t nat -L PREROUTING|grep -c SS_RULE_ENTRY) -gt 0 ]
+	do
+		iptables -t nat -D PREROUTING -p tcp -j SS_RULE_ENTRY
+	done
+	
+	while [ $(iptables -t nat -L SS_RULE_ENTRY 2>/dev/null|wc -l) -gt 0 ]
+	do
+		iptables -t nat -F SS_RULE_ENTRY
+		iptables -t nat -X SS_RULE_ENTRY
+	done
+
+	while [ $(iptables -t nat -L SS_RULE_FORWARD 2>/dev/null|wc -l) -gt 0 ]
+	do
+		iptables -t nat -F SS_RULE_FORWARD
+		iptables -t nat -X SS_RULE_FORWARD
+	done
+
+	while [ $(iptables -t nat -L OUTPUT|grep -c ss_out_dst_forward) -gt 0 ]
+	do
+		iptables -t nat -L OUTPUT --line-number|grep ss_out_dst_forward|cut -d" " -f1|xargs iptables -t nat -D OUTPUT
+	done	
+}
+
+createRule(){
+	createRuleIpset
+	createRuleFile
+	createRuleTable
+}
+destroyRule(){
+	destroyRuleTable
+	destroyRuleFile
+	destroyRuleIpset
+}
+
+resetRule()
+{
+	destroyRule
+	createRule
+}
+
+create_config() {
+	[ -z "$LOCALPORT" ] && { LOCALPORT="1081"; }
+	[ -n "$SERVER" ] || { echo "error: remote server is not set"; return 1; }
+	[ -n "$SERVERPORT" ] || { echo "error: remote server port is not set"; return 1; }
+	[ -n "$PASSWORD" ] || { echo "error: remote server password is not set"; return 1; }
+	[ -n "$METHOD" ] || { echo "error: remote server method is not set"; return 1; }
+
+cat << EOF > $CONFIG_FILE
+{
+	"server":"$SERVER",
+	"server_port":"$SERVERPORT",
+	"local_address":"0.0.0.0",
+	"local_port":"$LOCALPORT",
+	"password":"$PASSWORD",
+	"timeout":"180",
+	"method":"$METHOD"
+}
+EOF
+return 0
+}
+
+start() {
+	[ $ENABLED -ne 1 ] && { echo "Shadowsocks is off."; return 1; }
+
+	[ $(ps|grep -E 'ss-redir'|grep -Evc 'grep|/bin/sh') -ge 1 ] && { echo "Shadowsocks already started."; return 1; }
+
+	create_config
+	[ $? = 0 ] || { echo "config error."; return 1; }
+
+	case $DNSMODE in
+	0 )
+		service_start $MIWIFIPATH/bin/ss-dns2tcp -l 5353 -s $CLEANDNS -p $DNSPORT
+		[ $? = 0 ] || { echo "start ss-dns2tcp error."; return 1; }
+	;;
+	1 )
+		service_start $MIWIFIPATH/bin/ss-tunnel -l 5353 -L $CLEANDNS:$DNSPORT -U -c $CONFIG_FILE
+		[ $? = 0 ] || { echo "start ss-tunnel error."; return 1; }
+	;;
+	esac
+
+	service_start $MIWIFIPATH/bin/ss-redir -u -c $CONFIG_FILE
+	[ $? = 0 ] || { echo "start ss-redir error."; return 1; }
+
+	resetRule
+	/etc/init.d/dnsmasq restart
+}
+
+stop() {
+	service_stop $MIWIFIPATH/bin/ss-redir
+	service_stop $MIWIFIPATH/bin/ss-tunnel
+	service_stop $MIWIFIPATH/bin/ss-dns2tcp
+	destroyRule
+	/etc/init.d/dnsmasq restart
+}
+
+reload(){
+	[ $(ps|grep -E 'ss-redir'|grep -Evc 'grep|/bin/sh') -ge 1 ] && {
+		resetRule;/etc/init.d/dnsmasq reload
+		return 0
+	} || {
+		echo "Shadowsocks is not running."
+		return 1
+	}
+}
+

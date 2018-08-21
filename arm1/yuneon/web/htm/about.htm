@@ -1,0 +1,199 @@
+<%
+--[[
+	Info	关于MIWIFI PLUS
+]]--
+local ver = require("xiaoqiang.XQVersion").webVersion
+local XQLanWanUtil = require("xiaoqiang.util.XQLanWanUtil")
+local ip = XQLanWanUtil.getLanWanInfo("lan")["ipv4"][1]["ip"]
+%>
+<%include("web/inc/head")%>
+<title><%:小米路由器%></title>
+<meta name="viewport" content="width=1200">
+<link href="<%=resource%>/web/css/bc.css?v=<%=ver%>" rel="stylesheet">
+<link href="<%=resource%>/web/css/yuneon.css?v=<%=ver%>" rel="stylesheet">
+</head>
+<body>
+<div id="doc">
+	<%include("web/inc/header")%>
+	<div id="bd">
+		<div class="mod-set">
+			<div class="hd clearfix">
+				<div class="help">
+					<span class="ico"></span>
+					<span class="arrow-wrap" id="helpArrow">
+						<span class="arrow1"></span>
+						<span class="arrow2"></span>
+					</span>
+				</div>
+				<h3><%:MIWIFI PLUS%></h3>
+			</div>
+			<div class="bd">
+				<div class="section section-help" id="helpSection">
+					<div class="help-cont">
+						<span class="help-close"></span>
+						<div class="what">
+							<h3><%:插件简介%></h3>
+							<p><%:MIWIFI PLUS是一款精巧、高效的官方界面风格的Luci插件。%></p>
+							<P><%:作者好人以官方CSS为模板构建MIWIFI PLUS前台介面。并开发了独立的API以供调用。%></p>
+							<p><%:插件使用第三方程序结合MIWIFI PLUS前台及API来给大家提供便捷的使用体验。%></p><br/><br/>
+						</div>
+						<div class="qa" style="padding-right:300px">
+							<h3><%:常见问题%></h3>
+							<p><%:如有广告过滤不干净等问题，请咨询ADM官方QQ群：377971349；%></p>
+							<p><%:科学上网如有问题请尝试更改防污染模式和清洁DNS服务器，终端设备勿使用指定dns（须设为自动获取方式）；%></p>
+							<p><%:内网穿透问题请查看相关界面中的说明（点击“问号图标”便可以打开阅读），如有不详请使用搜索引擎查阅相关知识；%></p>
+							<p><%:如需开放远程WEB管理，请于”端口控制“页面开放8098端口，并以”公网ip:8098“的方式访问，如需远程ssh请开放22端口；%></p><br/><br/>
+						</div>
+					</div>
+				</div>
+				<div style="margin-top:45px"><span>最新版本：</span><span id="lastversion"></span>&nbsp;&nbsp;<a href='#' id='btnupdate' style='display:none;color:green;text-decoration:none'><%:更新%></a></div>
+				<div style="margin-top:45px"><span>当前版本：</span><span id="curversion"></span>&nbsp;&nbsp;<a href='#' id='btnremove' style="color:red;text-decoration:none;"><%:卸载%></a></div>
+			</div>
+			<div class="hd">
+				<h3><%:更新记录%></h3>
+			</div>
+			<div class="bd" id="updatelog">
+			</div>
+			<div class="hd">
+				<h3><%:插件信息%></h3>
+			</div>
+			<div class="bd">
+				<div style="margin-top:45px;padding-right:200px"><span><%:作者：好人%></span></div>
+				<div style="margin-top:30px;padding-right:200px"><span><%:插件Q群1：162049771;群2：110678294%></a></span></div>
+				<div style="margin-top:30px;padding-right:200px"><span><%:特别感谢：%>ADM 以及 Starry</a></span></div>
+				<div style="margin-top:30px;padding-right:200px"><span><%:感谢测试：%></a></span></div>
+				<div style="margin-top:15px;padding-right:200px"><span style="padding-right:20px"><%:ㄨ%></a></span><span style="padding-right:20px"><%:RE_%></a></span><span style="padding-right:20px"><%:过去的过去。%></a></span style="padding-right:20px"><span><%:MR.X%></a></span></div>
+				<div style="margin-top:15px;padding-right:200px"><span style="padding-right:20px"><%:迷失%></a></span><span style="padding-right:20px"><%:坏人%></a></span><span style="padding-right:20px"><%:无名%></a></span><span style="padding-right:20px"><%:文藝青年唔放炮%></a></span></div>
+				<div style="margin-top:15px;padding-right:200px"><span style="padding-right:20px"><%:小江童鞋%></a></span><span style="padding-right:20px"><%:大宝%></a></span><span style="padding-right:20px"><%:等众人%></a></span></div>
+			</div>
+		</div>
+	</div>
+	<%include("web/inc/footer")%>
+</div>
+<%include("web/inc/g.js")%>
+<script>
+var ModelAbout = (function() {
+	
+	function infoget(){
+		$("#curversion").html("获取中...");
+		$("#lastversion").html("获取中...");
+		$("#updatelog").html("获取中...");
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "about_info_get")%>', {},
+		function(rsp) {
+			var curversion = rsp.curversion
+			$("#curversion").html(curversion);
+			remoteinfoget(curversion);
+		});
+	}
+	
+	function remoteinfoget(curversion){
+		$.ajax({
+			url: "http://vv2.vicp.net/miwifi/version.php",
+			type: "GET",
+			dataType: 'jsonp',
+			success: function(rsp) {
+				var lastversion = rsp.lastversion;
+				$("#lastversion").html(lastversion);
+				var tplhtml = '';
+				var list = rsp.list;
+				if (list.length > 0) {
+					for (var i = 0; i < list.length; i++) {
+						tplhtml = tplhtml + "<div style='margin-top:45px'><span>" + list[i].date + " [Ver " + list[i].ver + "] " + list[i].log + "</span></span></div>";
+						if (i > 7) {
+							i=list.length;
+						} 
+					}
+				}
+				if (parseInt(lastversion.replace(/\./g, "")) > parseInt(curversion.replace(/\./g, ""))) {
+					$("#btnupdate").show();
+				}
+				$("#updatelog").html(tplhtml);
+			},
+			error: function(rsp) {
+				$("#lastversion").html("获取失败!");
+				$("#updatelog").html("获取失败!");
+			}
+		});
+	}
+	
+	function sethelp() {
+		$('.help .ico').on('click', function(){
+			$('#helpArrow').show();
+			$('#helpSection').show();
+		});
+		$('.help-close').on('click', function(){
+			$('#helpArrow').hide();
+			$('#helpSection').hide();
+		});
+	}
+	function setMiwifi() {
+		$('#btnupdate').on('click',function(e) {
+			e.preventDefault();
+			var wait = $.loadingDialog({
+					id : 'progressDailog',
+					title : '<%:插件更新中%>',
+					content : '<%:请耐心等待，不要刷新和操作小米路由web页面...%>',
+					cancel: false
+				});
+			ok = function(){
+				$.ajax({
+　　				url:'<%=luci.dispatcher.build_url("api", "yuneon", "about_miwifiplus_update")%>',
+　　				type : 'get',
+　　				data :{},
+　　				dataType:'json',
+　　				success:function(){
+                        setTimeout(function(){
+							wait.close();
+							window.location.reload( true );
+						},10*1000);
+					},
+					error:function(){
+                        setTimeout(function(){
+							wait.close();
+							window.location.reload( true );
+                        }, 10*1000);
+					}
+				});
+				wait.lock();;
+			};
+			$.confirm( '<%:你确定要更新MIWIFI PLUS吗？%>', ok );
+		});
+
+		$('#btnremove').on('click',
+		function(e) {
+			e.preventDefault();
+			var wait = $.loadingDialog({
+					id : 'progressDailog',
+					title : '<%:插件卸载中%>',
+					content : '<%:请耐心等待，不要刷新和操作小米路由web页面...%>',
+					cancel: false
+				});
+			ok = function(){
+				$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "about_miwifiplus_remove")%>', {},
+				function(rsp) {
+					if (rsp.code==0){
+						location.href = "http://" + window.location.host
+					}
+					else{
+						$.alert(rsp.msg)
+					}
+				});
+				wait.lock();;
+			}
+			$.confirm( '<%:你确定要卸载MIWIFI PLUS吗？%>', ok );
+		});
+	}
+	return {
+		init: function() {
+			infoget();
+			sethelp();
+			setMiwifi();
+		}
+	}
+} ());
+$(function(){
+	ModelAbout.init();
+});
+</script>
+</body>
+</html>
