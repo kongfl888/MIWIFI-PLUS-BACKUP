@@ -1,6 +1,6 @@
 ﻿#!/bin/sh
 
-pluginhost="https://coding.net/u/monlor/p/MIWIFI-PLUS-BACKUP/git/raw/master"
+pluginhost="coding.net/u/monlor/p/MIWIFI-PLUS-BACKUP/git/raw/master"
 clear
 echo "Miwifi Plus安装程序"
 echo "反馈请加QQ群1（已满）：162049771；群2：110678294"
@@ -44,7 +44,7 @@ fi
 echo "您使用的是$MODEL，为您下载对应安装包..."
 rm -rf /tmp/yuneon.tar.gz
 
-curl -kLo /tmp/yuneon.tar.gz http://$pluginhost/$cpu/yuneon.tar.gz 
+curl -kLo /tmp/yuneon.tar.gz https://$pluginhost/$cpu/yuneon.tar.gz 
 
 if [ $? -eq 0 ];
 then
