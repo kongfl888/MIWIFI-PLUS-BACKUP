@@ -1,0 +1,630 @@
+<%
+--[[
+    Info    KP
+]]--
+local ver = require("xiaoqiang.XQVersion").webVersion
+local uci = require("luci.model.uci").cursor()
+local hardwareModel = tostring(uci:get("misc", "hardware", "model"))
+%>
+<%include("web/inc/head")%>
+<title><%:小米路由器%></title>
+<meta name="viewport" content="width=1200">
+<link href="<%=resource%>/web/css/bc.css?v=<%=ver%>" rel="stylesheet">
+<link href="<%=resource%>/web/css/yuneon.css?v=<%=ver%>" rel="stylesheet">
+</head>
+<body>
+<div id="doc">
+    <%include("web/inc/header")%>
+    <div id="bd">
+        <div class="mod-set mod-kp">
+            <div class="hd">
+                <h3><%:KoolProxy广告过滤%></h3>
+				<div class="switch">
+                    <a href="#" id="kpswitch"></a>
+                </div>
+            </div>
+            <div class="bd mod-kp kpInfo" id="kpinfo" style="display:none;">
+                <p><%:KoolProxy是一款免费且功能强大的广告拦截软件，可以有效的拦截广告，阻止广告厂商进行跟踪用户行为，保护用户隐私。%><p><%:尤其可以过滤视频广告，主流的视频网站都可以无视广告，直接进行播放视频。%></p>
+            </div>
+			<div class="bd mod-set" id="kpstatus" ></div>
+		</div>
+			
+		<div class="mod-set mod-kp generalmgr" style="display:none">
+			<div class="hd">
+				<h3><%:综合设置%></h3>
+			</div>
+			<div class="bd">
+				<div id="ruleon" class="ruleon">
+					<div class="tab-con-item">
+						<form class="form" class="form" id="generalinfo">
+						</form>
+					</div>
+					<div class="item-contral" style="clear:both;">
+						<button type="submit" class="btn btn-primary btn-l" id="generalbtnSave"><span><%:保存并应用%></span></button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="mod-set mod-kp kp-device"  style="display:none">
+			<div class="hd">
+				<h3><%:设备分流%></h3>
+				<div class="switch">
+					<a href="#" id="deviceswitch" class="btn-switch btn-switch-off"></a>
+				</div>
+			</div>
+			<div class="bd">
+				<div id="deviceoff" class="ruleoff"><p><%:你可以自定义哪些设备走KoolProxy流量%></p></div>
+				<div id="deviceon" class="ruleon" style="display:none;">
+					<div id="devicedesc">
+						<p><%:可以通过添加设备来限定哪些设备可以使用KoolProxy流量%></p>
+					</div>
+					<div id="devicecont">
+						<table class="table">
+							<thead>
+								<th><%:名称%></th>
+								<th><%:MAC地址%></th>
+								<th style="width:80px; text-align:center;"><%:操作%></th>
+							</thead>
+							<tbody id="devicemacTbody">
+						</tbody>
+						</table>
+						<div class="btn-wrap">
+							<button class="btn btn-dft" id="adddevicelist"><span><%:从设备列表添加设备%></span></button>
+							<button class="btn btn-dft" id="adddevicemac"><span><%:通过MAC地址添加%></span></button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="mod-set mod-kp">	
+			<div class="hd rulemgr"  style="display:none;">
+				<h3><%:规则管理%></h3>
+			</div>
+			<div class="bd rulemgr"  style="display:none;">
+				<div class="section">
+					<h4><%:规则列表：%></h4>
+					<table class="table">
+						<thead>
+							<tr>
+								<th style="width:200px;padding-right:20px"><%:名称%></th>
+								<th><%:类型%></th>
+								<th><%:日期%></th>
+								<th><%:状态%></th>
+								<th><%:操作%></th>
+							</tr>
+						</thead>
+						<tbody id="rulemgrTbody">
+						</tbody>
+					</table>
+					<div class="addserver-contral">
+						<button id="ruleupdate" class="btn btn-primary btn-l"><span><%:应用并更新%></span></button>
+					</div>
+				</div>
+				</div>
+			</div>
+        </div>
+    </div>
+    <%include("web/inc/footer")%>
+</div>
+
+<script type="tmpl/text" id="tmplStatus">
+	<div class="kpStatus">
+		<ul>
+			<li><span class="k"><%:程序版本：%></span><span class="v">{$version}</span>&nbsp;&nbsp;<span class="v"><a id="downloadca" href="#" style="text-decoration:none"><%:[下载证书]%></a></span></li>
+			<li><span class="k"><%:程序状态：%></span>{if($kpok)}<span class="g"><%:运行中%></span>{else}<span class="r"><%:未运行%></span>{/if}</li>
+			<li><span class="k"><%:链路状态：%></span>{if($iptablesok)}<span class="g"><%:已建立%></span>{else}<span class="v"><%:未建立%></span>{/if}</li>
+		</ul>
+	</div>
+</script>
+<%include("web/inc/g.js")%>
+
+<script type="tmpl/html" id="tmplgeneralmgr">
+    <div class="item">
+        <span class="k"><%:HTTPS支持%></span>
+        <span class="v" id="https">
+            <label><input type="radio" name="https" value="1"{if ($https == 1)} checked{/if}> <span><%:启用%></span></label>
+            <label><input type="radio" name="https" value="0"{if ($https == 0)} checked{/if}> <span><%:禁用%></span></label>
+        </span>
+		<em class="t"></em>
+    </div>
+    <div class="item-more">
+        <span class="k"><%:额外端口%></span>
+        <span class="v" id="extport">
+            <label><input type="radio" name="extport" value="1"{if ($extport == 1)} checked{/if}> <span><%:启用%></span></label>
+            <label><input type="radio" name="extport" value="0"{if ($extport == 0)} checked{/if}> <span><%:禁用%></span></label>
+        </span>
+		<em class="t"></em>
+    </div>
+	<div class="form-item-select">
+		<label class="k"><%:链路规则%></label>
+		<span class="v">
+			<select name="fltype" id="fltype" class="beautify fltype">
+				<option value="0" {if($fltype == '0')}selected="selected"{/if}><%:全局模式%></option>
+				<option value="1" {if($fltype == '1')}selected="selected"{/if}><%:推荐模式%></option>
+				<option value="2" {if($fltype == '2')}selected="selected"{/if}><%:视频模式%></option>
+			</select>
+		</span>
+		<em class="t"></em>
+	</div>
+	<div class="form-item">
+		<label class="k"><%:监听端口%></label>
+		<span class="v"><input type="text" name="port" id="port" reqMsg = "<%:监听端口%>" class="ipt-text" datatype="n-5" minValue="1" maxValue="65535" value="{$port}"></span>
+		<em class="t"></em>
+	</div>
+</script>
+
+<script type="tmpl/html" id="tmplRulemgr">
+<tr data-rule-id="{$id}">
+	<td style="text-overflow:ellipsis;white-space:nowrap;padding-right:20px">{$name}</td>
+	<td>{if($type == 2)}<%:自定义规则%>{else}<%:官方规则%>{/if}</td>
+	<td>{$pub_time}</td>
+	<td class="con">{if($enable == 1)}<span style="color:green"><%:已启用%></span>{else}<span style="color:red"><%:未启用%></span>{/if}</td>
+	<td><a href="#" class="btn btn-dft switch btn-s"><span>{if($enable == 1)}<%:禁用%>{else}<%:启用%>{/if}</span></a>{if($type == 2)}<a href="#" class="btn btn-dft del btn-s" style="margin-left:10px"><span><%:删除%></span></a>{/if}</td>
+</tr>
+</script>
+
+<script type="tmpl/html" id="tmplAddList">
+	<div class="dialog-listadd-form-wrap">
+		<form  class="form" id="listAdd">
+			<table class="table">
+				<thead>
+					<tr>
+						<th><%:设备名称%></th>
+						<th width="90"><%:状态%></th>
+						<th><%:MAC地址%></th>
+						<th width="30"><%:操作%></th>
+					</tr>
+				</thead>
+				<tbody id="dialogdeviceslist">
+					<tr>
+						<td colspan="4"><%:正在查询中...%></td>
+					</tr>
+				</tbody>
+			</table>
+			<div class="form-contral">
+				<button type="submit" class="btn btn-primary" id="listAddSubmit"><span><%:确定%></span>
+				</button>
+				<button type="submit" class="btn btn-dft" id="listAddClose"><span><%:取消%></span>
+				</button>
+			</div>
+		</form>
+	</div>
+</script>
+
+<script type="tmpl/html" id="tmpldevicemac">
+<tr>
+	<td>{$name}</td>
+	<td>{$mac}</td>
+	<td><button class="btn btn-dft device-del" data-macs="{$mac}"><span><%:删除%></span></button></td>
+</tr>
+</script>
+
+<script type="tmpl/html" id="tmplAddList">
+	<div class="dialog-listadd-form-wrap">
+		<form  class="form" id="listAdd">
+			<table class="table">
+				<thead>
+					<tr>
+						<th><%:设备名称%></th>
+						<th width="90"><%:状态%></th>
+						<th><%:MAC地址%></th>
+						<th width="30"><%:操作%></th>
+					</tr>
+				</thead>
+				<tbody id="dialogdeviceslist">
+					<tr>
+						<td colspan="4"><%:正在查询中...%></td>
+					</tr>
+				</tbody>
+			</table>
+			<div class="form-contral">
+				<button type="submit" class="btn btn-primary" id="listAddSubmit"><span><%:确定%></span>
+				</button>
+				<button type="submit" class="btn btn-dft" id="listAddClose"><span><%:取消%></span>
+				</button>
+			</div>
+		</form>
+	</div>
+</script>
+
+<script type="tmpl/html" id="tmplDevice">
+	<tr>
+		<td>{$name}</td>
+		<td>{$status}</td>
+		<td>{$mac}</td>
+		<td>
+			<input class="deviceinput" type="checkbox" name="nowmac" value="{$mac}" />
+		</td>
+	</tr>
+</script>
+<script type="tmpl/html" id="tmplAddmac">
+	<div class="dialog-add-bymac">
+		<form class="form" name="addbymac" id="addbymac">
+			<p><%:请输入设备的MAC地址%></p>
+			<div class="form-item">
+				<label class="k">
+					<%:MAC地址%>
+				</label>
+				<span class="v">
+					<input type="text" id="macaddr" name="addr" class="ipt-text" datatype="macaddr" reqMsg="<%:MAC地址%>" />
+				</span>
+				<em class="t"></em>
+			</div>
+			<div class="form-contral">
+				<button type="submit" class="btn btn-primary" id="macAddSubmit"><span><%:确定%></span>
+				</button>
+				<button type="submit" class="btn btn-dft" id="macAddClose"><span><%:取消%></span>
+				</button>
+			</div>
+		</form>
+	</div>
+</script>
+
+<script>
+var modelKP = (function(){
+	function kpGet(){
+		$.pub('loading:start');
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_get")%>', function(rsp){
+			$.pub('loading:stop');
+			if (rsp.enabled==1) {
+				var statusHTML = StringH.tmpl( $('#tmplStatus').html(), {
+					kpok: rsp.kpok,
+					iptablesok: rsp.iptablesok,
+					version: rsp.version
+				});
+				$('#kpstatus').html( statusHTML )
+				$('#kpswitch')[0].className = 'btn-switch btn-switch-on';
+				$('#kpinfo').hide();
+				$('#kpstatus').show();
+				$('.generalmgr').show();
+				//$('.rulemgr').show();
+				$('.kp-device').show();
+			} else {
+				$('#kpswitch')[0].className = 'btn-switch btn-switch-off';
+				$('#kpstatus').hide();
+				$('#kpinfo').show();
+				$('.generalmgr').hide();
+				//$('.rulemgr').hide();
+				$('.kp-device').hide();
+			}
+		});
+	}
+	
+	function kpSet(){
+		$.pub('loading:start');
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_set")%>', function(rsp){
+			$.pub('loading:stop');
+			if (rsp.code == 0) {
+				kpGet();
+			}
+		});
+	}
+	
+	function generalGet(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_general_get")%>', function(rsp){
+			if (rsp.code == 0) {
+				tpldata = {
+					port: rsp.info.port,
+					https: rsp.info.https,
+					extport: rsp.info.extport,
+					fltype: rsp.info.fltype
+				};
+				tpl = $("#tmplgeneralmgr").html();
+				$("#generalinfo").html(tpl.tmpl(tpldata));
+				$.selectBeautify();
+				$.formInit();
+			}
+			else{
+			}
+		});
+	}
+	
+	function generalSet(){
+		var port = $("#port").val();
+		var https = $('#https input[name="https"]:checked').val();
+		var extport = $('#extport input[name="extport"]:checked').val();
+		var fltype = $("#fltype").children('option:selected').val();
+		$('#generalbtnSave').addClass('btn-primary-disabled').prop('disabled', true).find('span').text('<%:应用中...%>');
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_general_set")%>', {'port': port, 'https': https, 'fltype': fltype, 'extport': extport}, function(rsp){
+			if( rsp.code == 0 ){
+				kpGet();
+				generalGet();
+                $('#generalbtnSave').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:保存并应用%>');
+			}else{
+				kpGet();
+				generalGet();
+                $('#generalbtnSave').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:保存并应用%>');
+				$.alert( rsp.msg );
+			}
+		});
+	}
+	
+	function certGet(){
+		if ($('#downloadca').attr("state") == "off") { return false }
+		$('#downloadca').attr("state", "off");
+		$('#downloadca').css("cursor","default");
+		$('#downloadca').css("color","black");
+		$('#downloadca').html("<%:[生成中]%>");
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_cert_get")%>', function(rsp){
+			if (rsp.code == 0) {
+				var hostname = window.location.hostname;
+				var port = window.location.port;
+				var url = 'http://' + hostname;
+				if (port) {
+					url= url + ':' + port
+				}
+				var url = url + '/backup/log/kp_ca.crt'
+				window.location=url; 
+				$('#downloadca').attr("state", "");
+				$('#downloadca').css("cursor","");
+				$('#downloadca').css("color","");
+				$('#downloadca').html("<%:[下载证书]%>");
+			}
+			else{
+				$.alert(rsp.code);
+			}
+		});
+	}
+	
+	function ruleGet(){
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_rule_get")%>', {}, function(rsp){
+			$.pub( 'loading:stop' );
+			var tpl = $('#tmplRulemgr').html();
+			if(rsp.code == 0){
+				var list = rsp.rulelist;
+				var trarr = [];
+				if($.isArray(list) && list.length > 0){
+					for(var i = 0, len = list.length; i < len; i++){
+						var tr = StringH.tmpl(tpl, {
+							id: i+1,
+							name: list[i].name,
+							type: list[i].type,
+							pub_time: list[i].pub_time,
+							enable: list[i].enable,
+						});
+						trarr.push(tr);
+					}
+					$('#rulemgrTbody').html(trarr.join(''));
+				}else{
+					$('#rulemgrTbody').html('<tr><td colspan="4" style="text-align:center;"><%:未找到规则%></td></tr>');
+				}
+			}
+		});
+	}
+	
+	function ruleSet(data){
+		var targetElement = data.targetElement;
+		var tr = $(targetElement).closest('tr');
+		var id = tr.attr('data-rule-id');
+		$.pub( 'loading:start' );
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_rule_set")%>', {id: id}, function(rsp){
+			$.pub( 'loading:stop' );
+			if(rsp.code == 0){
+				kpGet();
+				ruleGet();
+			}
+			else{
+				kpGet();
+				ruleGet();
+				$.alert("操作失败");
+			}
+		});
+	}
+	
+	function ruleUpdate(){
+		$('#ruleupdate').addClass('btn-primary-disabled').prop('disabled', true).find('span').text('<%:应用中...%>');
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_rule_update")%>', {}, function(rsp){
+			if(rsp.code == 0){
+				ruleGet();
+				$('#ruleupdate').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:应用并更新%>');
+			}
+			else{
+				$('#ruleupdate').removeClass('btn-primary-disabled').prop('disabled', false).find('span').text('<%:应用并更新%>');
+				$.alert("操作失败");
+			}
+		});
+	}
+	
+	function deviceSwitch(){
+		var btn = $('#deviceswitch');
+		btn.on('click', function(e){
+			e.preventDefault();
+			$.pub( 'loading:start' );
+			$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_device_switch")%>', {}, function(rsp){
+				$.pub( 'loading:stop' );
+				if( rsp.code == 0 ){
+					kpGet();
+					deviceGet();
+				}else{
+					kpGet();
+					deviceGet();
+					$.alert( rsp.msg );
+				}
+			});
+		});
+	}
+	function deviceGet(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon", "kp_device_get")%>', {}, function(rsp){
+			if( rsp.code == 0 ){
+				if( rsp.info.enable == 1 ){
+					$('#deviceswitch')[0].className = 'btn-switch btn-switch-on';
+					$('#deviceoff').hide();
+					$('#deviceon').show();
+					var maclist = rsp.info.maclist;
+					var mnamelist = rsp.info.namelist;
+					var mtrarr = [];
+					var mtpl = $('#tmpldevicemac').html();
+					if( $.isArray(maclist) && maclist.length > 0 ){
+						for(var j = 0, l = maclist.length; j < l; j++){
+							var mtr = StringH.tmpl(mtpl, {
+								mac: maclist[j],
+								name: mnamelist[ maclist[j] ]
+							});
+							mtrarr.push(mtr);
+						}
+						$('#devicemacTbody').html(mtrarr.join(''));
+					}else{
+						$('#devicemacTbody').html('<tr><td colspan="3" style="text-align:center;"><%:还未添加设备%></td></tr>');
+					}
+				}else{
+					$('#deviceswitch')[0].className = 'btn-switch btn-switch-off';
+					$('#deviceoff').show();
+					$('#deviceon').hide();
+				}
+			}else{
+				$.alert( rsp.msg );
+			}
+		});
+	}
+	function addDeviceByDeviceList(){
+		$.getJSON('<%=luci.dispatcher.build_url("api", "yuneon","kp_mac_get")%>', {}, function(rsp){
+			if( rsp.code == 0 ){
+				var list = rsp.list;
+				var trarr = [];
+				var tpl = $('#tmplDevice').html();
+				if($.isArray(list) && list.length > 0){
+					for(var i = 0, len = list.length; i < len; i++){
+						var tr = StringH.tmpl(tpl, {
+							name: list[i].name,
+							status: list[i].online == 1 ? '<%:在线%>' : '<%:离线%>',
+							mac: list[i].mac
+						});
+						trarr.push(tr);
+					}
+					$('#dialogdeviceslist').html(trarr.join(''));
+					$('#listAddClose').on('click', function(e){
+						e.preventDefault();
+						devicelistDialog.close();
+					});
+					$('#listAddSubmit').on('click', function(e){
+						e.preventDefault();
+						var inputs = $('.deviceinput:checked');
+						var valarr = [];
+						if( inputs.length < 1 ){
+							alert("<%:请至少选择一个设备%>");
+						}else{
+							inputs.each(function (index, item) {
+								valarr.push( $.trim( item.value ) );
+							});
+							mac = valarr.join(',');
+							devicelistDialog.close();
+							setDeviceMac(mac, 0);
+						}
+					});
+				}else{
+					$('#dialogdeviceslist').html('<tr><td colspan="4" style="text-align:center;"><%:还没有设备连接进来%></td></tr>');
+				}
+			}
+		});
+	}
+	function addDeviceByMac(){
+		$('#macAddClose').on('click', function(e){
+			e.preventDefault();
+			addDevicemacDialog.close();
+		});
+		$('#macAddSubmit').on('click', function(e){
+			e.preventDefault();
+			var validator = Valid.checkAll($('#addbymac')[0]);
+			if(validator){
+				var mac = $.trim( $('#macaddr').val() );
+				addDevicemacDialog.close();
+				setDeviceMac(mac, 0);
+			}
+		});
+	}
+	function setDeviceMac( macs, opt ){
+	$.pub( 'loading:start' );
+		$.ajax({
+			url: '<%=luci.dispatcher.build_url("api", "yuneon", "kp_device_set")%>',
+			type: 'POST',
+			data: {'macs': macs, 'opt': opt},
+			dataType: 'json',
+			success: function(rsp){
+				$.pub( 'loading:stop' );
+				if( rsp.code == 0 ){
+					kpGet();
+					deviceGet();
+				}else{
+					kpGet();
+					deviceGet();
+					$.alert( rsp.msg );
+				}
+			}
+		});
+	}
+	function delDevice( ele ){
+		var para = '';
+		para = $(ele).attr('data-macs');
+		setDeviceMac( para, 1 );
+	}
+	
+	function addEvent(){
+		$('#kpswitch').on('click', function(e){
+			e.preventDefault();
+			kpSet();
+        });
+		$('#ruleupdate').on('click', function(e){
+			e.preventDefault();
+			ruleUpdate();
+		});
+		$("body").delegate('#generalbtnSave', 'click', function(e){
+			e.preventDefault();
+			generalSet();
+		});
+		$('body').delegate('#downloadca', 'click', function(e){
+			e.preventDefault();
+			certGet();
+		});
+		$('body').delegate('#rulemgrTbody .switch', 'click', function(e){
+			e.preventDefault();
+			ruleSet({targetElement: this});
+		});
+		$('#adddevicelist').on('click', function(){
+			devicelistDialog = $.dialog({
+				title: '<%:请选择需要使用KP的设备%>',
+				content: $('#tmplAddList').html(),
+				lock: true,
+				width: 600,
+				initialize: function(){
+					addDeviceByDeviceList();
+				}
+			});
+		});
+		$('#adddevicemac').on('click', function(){
+			addDevicemacDialog = $.dialog({
+				title: '<%:通过MAC地址添加要使用KP的设备%>',
+				content: $('#tmplAddmac').html(),
+				lock: true,
+				width: 390,
+				initialize: function(){
+					addDeviceByMac();
+				}
+			});
+		});
+		$('body').delegate('.device-del', 'click', function(){
+			var self = this;
+			delDevice( self );
+		});
+	}
+	return {
+		init : function(){
+			kpGet();
+			generalGet();
+			//ruleGet();
+			deviceSwitch();
+			deviceGet();
+			addEvent();
+		}
+	}
+})();
+
+$(function() {
+	modelKP.init();
+});
+
+</script>
+</body>
+</html>

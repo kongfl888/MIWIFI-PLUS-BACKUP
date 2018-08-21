@@ -1,0 +1,22 @@
+#!/bin/sh
+local url="https://koolshare.ngrok.wang/maintain_files/gfwlist.conf"
+local ipsetpath="$(uci get yuneon.miwifiplus.path)/ipset"
+rm -rf /tmp/tmp_list.conf
+rm -rf /tmp/dns_list.conf
+rm -rf /tmp/gfw_list.conf
+touch /tmp/dns_list.conf
+touch /tmp/gfw_list.conf
+curl -s -k --speed-time 3 --speed-limit 10 "$url" -o /tmp/tmp_list.conf
+[ $? -eq 1 ] && {
+	echo "Download list failed!";
+	return 1
+}
+cat /tmp/tmp_list.conf|awk '{if($0~"server=") print $0>>"/tmp/dns_list.conf";else if($0~"ipset=") print $0>>"/tmp/gfw_list.conf"}'
+sed -i 's/#7913/#5353/g' /tmp/dns_list.conf
+sed -i 's/gfwlist/gfw_list/g' /tmp/gfw_list.conf
+cp -rf /tmp/dns_list.conf $ipsetpath/dns_list.conf
+cp -rf /tmp/gfw_list.conf $ipsetpath/gfw_list.conf
+rm -rf /tmp/tmp_list.conf
+rm -rf /tmp/dns_list.conf
+rm -rf /tmp/gfw_list.conf
+return 0

@@ -1,0 +1,43 @@
+
+		<%if string.find(REQUEST_URI, "/extsetting") then%>
+        <div class="mod-set-nav mod-set-nav-pro">
+            <ul class="clearfix li-6">
+                <li <%if string.find(REQUEST_URI, "/kp") then%>class="active"<%end%>>
+					<a href="<%=luci.dispatcher.build_url("web","extsetting","kp")%>">
+                        <i class="ico ico-19"></i>
+                        <span><%:广告过滤%></span>
+                    </a>
+                </li>
+                <li <%if string.find(REQUEST_URI, "/ss") then%>class="active"<%end%>>
+					<a href="<%=luci.dispatcher.build_url("web","extsetting","ss")%>">
+                        <i class="ico ico-14"></i>
+                        <span><%:科学上网%></span>
+                    </a>
+                </li>
+                <li <%if string.find(REQUEST_URI, "/ngrok") then%>class="active"<%end%>>
+					<a href="<%=luci.dispatcher.build_url("web","extsetting","ngrok")%>">
+                        <i class="ico ico-15"></i>
+                        <span><%:内网穿透%></span>
+                    </a>
+                </li>
+                <li <%if string.find(REQUEST_URI, "/firewall") then%>class="active"<%end%>>
+					<a href="<%=luci.dispatcher.build_url("web","extsetting","firewall")%>">
+                        <i class="ico ico-16"></i>
+                        <span><%:端口控制%></span>
+                    </a>
+                </li>
+                <li <%if string.find(REQUEST_URI, "/webssh") then%>class="active"<%end%>>
+					<a href="<%=luci.dispatcher.build_url("web","extsetting","webssh")%>">
+                        <i class="ico ico-17"></i>
+                        <span><%:WEBSSH%></span>
+                    </a>
+                </li>
+                <li <%if string.find(REQUEST_URI, "/about") then%>class="active"<%end%>>
+					<a href="<%=luci.dispatcher.build_url("web","extsetting","about")%>">
+                        <i class="ico ico-18"></i>
+                        <span><%:插件信息%></span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <%end%>

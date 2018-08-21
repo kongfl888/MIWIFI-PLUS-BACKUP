@@ -1,0 +1,75 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+MIWIFIPATH=$(uci -q get yuneon.miwifiplus.path)
+
+getType(){
+	local type=""
+	case $1 in
+		1 )
+		type="http"
+	;;
+		2 )
+		type="https"
+	;;
+		3 )
+		type="tcp"
+	;;
+		* )
+		type="http"
+	;;
+	esac
+	echo $type
+}
+
+createCmdstr(){
+	local cmdstr=""
+	SECTIONS=""
+	config_cb() 
+	{
+		SECTIONS="$SECTIONS $2"
+	}
+	config_load "ngrok"
+	for section in $SECTIONS
+	do
+		config_get enabled $section enabled
+		[ $enabled -eq 1 ] && {
+			config_get proto $section proto
+			config_get shost $section shost
+			config_get lhost $section lhost
+			config_get lport $section lport
+			config_get hostname $section hostname
+			config_get rport $section rport
+			local type=`getType $proto`
+			if [ "$type" == "tcp" ]; then
+				cmdstr="$cmdstr -AddTun[Type:$type,Lhost:$lhost,Lport:$lport,Rport:$rport]"
+			else
+				cmdstr="$cmdstr -AddTun[Type:$type,Lhost:$lhost,Lport:$lport,Hostname:$hostname]"
+			fi
+		}
+	done
+	[ -z "$cmdstr" ] || cmdstr="$MIWIFIPATH/bin/ngrokc -SER[Shost:`echo $shost | cut -d \: -f 1`,Sport:`echo $shost | cut -d \: -f 2`]$cmdstr"
+	echo $cmdstr
+}
+
+start(){
+	[ $(ps|grep bin/ngrok|grep -Evc 'grep|/bin/sh') -ge 1 ] && { echo "ngrok already started."; return 1; }
+	local runstr=`createCmdstr`
+	[ -z "$runstr" ] || service_start $runstr
+	sleep 1s
+}
+stop(){
+	service_stop $MIWIFIPATH/bin/ngrokc
+	rm -rf /tmp/log/ngrok.log
+	sleep 1s
+}
+restart(){
+	stop
+	start
+}

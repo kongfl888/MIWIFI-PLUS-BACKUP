@@ -1,0 +1,66 @@
+#!/bin/sh
+
+_ini_usage()
+{
+	echo "Usage: $0 get filename.ini section key
+or
+Usage: $0 set filename.ini section key value"
+	return 1
+}
+
+_ini_get()
+{
+	local file=$1
+	local sec=$2
+	local key=$3
+
+	if [ $# != 3 ]
+		then
+		_ini_usage $@
+		return $?
+	fi
+
+	awk -F "[=;#]+" '/^\[[ \t]*'$sec'[ \t]*\]/{a=1}a==1&&$1~/^[ \t]*'$key'[ \t]*/{gsub(/[ \t]+/,"",$2);print $2;exit}' $file
+	return $?
+}
+
+_ini_set()
+{
+	local file=$1
+	local sec=$2
+	local key=$3
+	local val=$4
+
+	if [ $# != 4 ]
+		then
+		_ini_usage $@
+		return $?
+	fi
+
+	sed -i "/^\[[ \t]*$sec[ \t]*\]/,/^\[/s/^[ \t]*\($key[ \t]*=[ \t]*\)[^ \t;#]*/\1$val/" $file
+	return $?
+}
+
+ini()
+{
+	local CMD=${1:-help}
+	shift
+	case ${CMD} in
+		help)
+			_ini_usage $@
+			;;
+		get)
+			_ini_get $@
+			;;
+		set)
+			_ini_set $@
+			;;
+		*)
+			echo "unknown command"
+			return 1
+			;;
+	esac
+	return $?
+}
+
+ini $@

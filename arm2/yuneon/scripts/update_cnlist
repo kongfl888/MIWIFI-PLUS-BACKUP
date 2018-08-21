@@ -1,0 +1,15 @@
+#!/bin/sh
+local url="https://koolshare.ngrok.wang/maintain_files/chnroute.txt"
+local ipsetpath="$(uci get yuneon.miwifiplus.path)/ipset"
+rm -rf /tmp/tmp_list.conf
+rm -rf /tmp/cn_list.conf
+local http_code=$(curl -s -k -w %{http_code} --speed-time 3 --speed-limit 10 $url -o /tmp/tmp_list.conf)
+[ $http_code -ne 200 ] && {
+	echo "Download cn_list failed!";
+	return 1
+}
+cat /tmp/tmp_list.conf|awk '{print "add cn_list " $0 >>"/tmp/cn_list.conf"}'
+cp -rf /tmp/cn_list.conf $ipsetpath/cn_list.conf
+rm -rf /tmp/tmp_list.conf
+rm -rf /tmp/cn_list.conf
+return 0

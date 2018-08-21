@@ -1,0 +1,178 @@
+#!/bin/sh
+
+VERSION="1.2.3.6666"
+MODEL=$(cat /proc/xiaoqiang/model)
+MOUNTFILESPATH="/tmp/moutfiles"
+LUAPATH="/usr/lib/lua"
+DDNSPATH="/usr/lib/ddns"
+CSSPATH="/www/xiaoqiang/web/css"
+IMGPATH="/www/xiaoqiang/web/img"
+if [ "$MODEL" = "R1D" -o "$MODEL" = "R2D" ];
+then
+	CPU="arm1"
+	MIWIFIPATH="/etc/yuneon"
+elif [ "$MODEL" = "R3D" ];
+then
+	CPU="arm2"
+	MIWIFIPATH="/etc/yuneon"
+elif [ "$MODEL" = "R3" ];
+then
+	CPU="mipsel1"
+	MIWIFIPATH="/etc/yuneon"
+elif [ "$MODEL" = "R1CM" ];
+then
+	CPU="mipsel1"
+	if [ $(df|grep -Ec '\/extdisks\/sd[a-z][0-9]?$') -eq 0 ];
+	then
+		echo "未找到外置存储设备，退出。"
+		return 1
+	else
+		MIWIFIPATH="$(ls /extdisks/sd*/yuneon/scripts/yuneoninit 2>/dev/null | sed 's/\/scripts\/yuneoninit//' | awk '{print;exit}')"
+	fi
+elif [ "$MODEL" = "R3P" ];
+then
+	CPU="mipsel2"
+	MIWIFIPATH="/etc/yuneon"
+else
+	echo "暂不支持您的路由器。"
+	return 1
+fi
+
+##移除已加载目录
+umount -lf $DDNSPATH 2>/dev/null
+umount -lf $CSSPATH 2>/dev/null
+umount -lf $IMGPATH 2>/dev/null
+umount -lf $LUAPATH 2>/dev/null
+
+##建立MOUNTFILES目录
+rm -rf $MOUNTFILESPATH
+mkdir -p $MOUNTFILESPATH
+cp -rf $CSSPATH $MOUNTFILESPATH
+cp -rf $IMGPATH $MOUNTFILESPATH
+cp -rf $DDNSPATH $MOUNTFILESPATH
+cp -rf $LUAPATH $MOUNTFILESPATH
+
+cp -rf $MIWIFIPATH/lua/yuneon $MOUNTFILESPATH/lua/
+cp -rf $MIWIFIPATH/lua/yuneon.lua $MOUNTFILESPATH/lua/luci/controller/api/
+
+ln -sf $MIWIFIPATH/web/img/*.png $MOUNTFILESPATH/img/
+ln -sf $MIWIFIPATH/web/css/*.css $MOUNTFILESPATH/css/
+
+mkdir -p $MOUNTFILESPATH/lua/luci/view/web/yuneon
+ln -sf $MIWIFIPATH/web/htm/* $MOUNTFILESPATH/lua/luci/view/web/yuneon/
+
+ln -sf $MIWIFIPATH/scripts/dynamic_dns_updater.sh $MOUNTFILESPATH/ddns/
+
+ln -sf $MIWIFIPATH/scripts/kp /etc/init.d/
+ln -sf $MIWIFIPATH/scripts/ngrok /etc/init.d/
+ln -sf $MIWIFIPATH/scripts/shadowsocks /etc/init.d/
+##
+
+##生成并初始化配置文件
+[ $(ls -ls /etc/config/ddns 2>/dev/null|wc -l) -eq 0 ] && touch /etc/config/ddns
+[ $(ls -ls /etc/config/yuneon 2>/dev/null|wc -l) -eq 0 ] && touch /etc/config/yuneon
+[ $(ls -ls /etc/config/shadowsocks 2>/dev/null|wc -l) -eq 0 ] && touch /etc/config/shadowsocks
+[ $(ls -ls /etc/config/ngrok 2>/dev/null|wc -l) -eq 0 ] && touch /etc/config/ngrok
+[ -z $(uci -q get yuneon.miwifiplus) ] && uci set yuneon.miwifiplus=class
+[ -z $(uci -q get yuneon.adm) ] && uci set yuneon.adm=class
+[ -z $(uci -q get yuneon.kp) ] && uci set yuneon.kp=class
+[ -z $(uci -q get yuneon.shadowsocks) ] && uci set yuneon.shadowsocks=class
+[ -z $(uci -q get yuneon.adm.enabled) ] && uci set yuneon.adm.enabled=0
+[ -z $(uci -q get yuneon.adm.dev_enable) ] && uci set yuneon.adm.dev_enable=0
+[ -z $(uci -q get yuneon.adm.fltype) ] && uci set yuneon.adm.fltype=1
+[ -z $(uci -q get yuneon.adm.https) ] && uci set yuneon.adm.https=0
+[ -z $(uci -q get yuneon.adm.extport) ] && uci set yuneon.adm.extport=0
+[ -z $(uci -q get yuneon.kp.enabled) ] && uci set yuneon.kp.enabled=0
+[ -z $(uci -q get yuneon.kp.dev_enable) ] && uci set yuneon.kp.dev_enable=0
+[ -z $(uci -q get yuneon.kp.fltype) ] && uci set yuneon.kp.fltype=1
+[ -z $(uci -q get yuneon.kp.https) ] && uci set yuneon.kp.https=0
+[ -z $(uci -q get yuneon.kp.lport) ] && uci set yuneon.kp.lport=3000
+[ -z $(uci -q get yuneon.kp.extport) ] && uci set yuneon.kp.extport=0
+[ -z $(uci -q get yuneon.shadowsocks.enabled) ] && uci set yuneon.shadowsocks.enabled=0
+[ -z $(uci -q get yuneon.shadowsocks.dev_enable) ] && uci set yuneon.shadowsocks.dev_enable=0
+[ -z $(uci -q get yuneon.shadowsocks.local_port) ] && uci set yuneon.shadowsocks.local_port=1081
+[ -z $(uci -q get yuneon.shadowsocks.dns_mode) ] && uci set yuneon.shadowsocks.dns_mode=1
+[ -z $(uci -q get yuneon.shadowsocks.pac_mode) ] && uci set yuneon.shadowsocks.pac_mode=0
+[ -z $(uci -q get yuneon.shadowsocks.ulist_mode) ] && uci set yuneon.shadowsocks.ulist_mode=1
+[ -z $(uci -q get yuneon.shadowsocks.clean_dns) ] && uci set yuneon.shadowsocks.clean_dns=8.8.8.8
+uci set yuneon.miwifiplus.version=$VERSION
+uci set yuneon.miwifiplus.path=$MIWIFIPATH
+uci commit yuneon
+
+##修改index.lua，添加插件web索引
+sed -i '/智能限速QoS/a||||    entry({"web", "extsetting", "about"}, template("web/yuneon/about"), _("插件信息"), 76)' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i '/智能限速QoS/a||||    entry({"web", "extsetting", "webssh"}, template("web/yuneon/webssh"), _("WEBSSH"), 75)' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i '/智能限速QoS/a||||    entry({"web", "extsetting", "firewall"}, template("web/yuneon/firewall"), _("端口控制"), 74)' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i '/智能限速QoS/a||||    entry({"web", "extsetting", "ngrok"}, template("web/yuneon/ngrok"), _("内网穿透"), 73)' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i '/智能限速QoS/a||||    entry({"web", "extsetting", "ss"}, template("web/yuneon/ss"), _("科学上网"), 72)' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i '/智能限速QoS/a||||    entry({"web", "extsetting", "kp"}, template("web/yuneon/kp"), _("广告过滤"), 71)' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i '/智能限速QoS/a||||    entry({"web", "extsetting"}, alias("web", "extsetting", "kp"), _("路由设置"), 70)' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i '/智能限速QoS/a||||' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i 's/setting\/ddns/yuneon\/ddns/' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+sed -i 's/||||//' $MOUNTFILESPATH/lua/luci/controller/web/index.lua
+##
+
+##修改header.htm，添加插件项目
+sed -i '/高级设置/a\|||                    <li <%if string.find(REQUEST_URI, "/extsetting") then%>class="active"<%end%>><a href="<%=luci.dispatcher.build_url("web","extsetting","kp")%>"><%:扩展设置%></a></li>' $MOUNTFILESPATH/lua/luci/view/web/inc/header.htm
+sed -i 's/|||//' $MOUNTFILESPATH/lua/luci/view/web/inc/header.htm
+sed -i '/tore") then%>$/i\|||' $MOUNTFILESPATH/lua/luci/view/web/inc/header.htm
+rm -rf /tmp/extmp
+sed -i "/|||/r $MIWIFIPATH/templets/extmp" $MOUNTFILESPATH/lua/luci/view/web/inc/header.htm
+sed -i '/|||/d' $MOUNTFILESPATH/lua/luci/view/web/inc/header.htm
+rm -rf /tmp/extmp
+sed -i 's/class="goto-topo"/class="goto-topo" style="padding-left:20px"/' $MOUNTFILESPATH/lua/luci/view/web/inc/header.htm
+sed -i 's/完整网络%><\/a><\/span>/完整网络%><\/a><\/span><br\/>/' $MOUNTFILESPATH/lua/luci/view/web/inc/header.htm
+##
+
+##修复外网访问
+sed -i '/server_port = "8098"/{n;n;'s/0/1/';n;'s/#/'set $is_intercept 0;\n      #'/';}' /etc/sysapihttpd/miwifi-webinitrd.conf
+sed -i 's/finalvar = "0 1"/finalvar = "0 0"/' /etc/sysapihttpd/miwifi-webinitrd.conf
+sed -i 's/string.upper(luci.sys.net.ip4mac(remote_addr))/luci.sys.net.ip4mac(remote_addr)/' $MOUNTFILESPATH/lua/luci/view/web/setting/wan.htm
+sed -i '/getDefaultMacAddress/amac = mac and string.upper(mac) or macdefault' $MOUNTFILESPATH/lua/luci/view/web/setting/wan.htm
+cp -rf /etc/sysapihttpd/miwifi-webinitrd.conf /tmp/sysapihttpdconf/
+##
+
+##使移动端能够登录web管理，并返回老界面
+sed -i 's/#admin-mob/#admin-PC/' $MOUNTFILESPATH/lua/luci/view/web/sysauth.htm
+sed -i 's/="detail"/="pic"/' $MOUNTFILESPATH/lua/luci/view/web/sysauth.htm
+sed -i 's/下载小米WiFi APP管理路由器/<img src="<%=routerSrc %>" >/' $MOUNTFILESPATH/lua/luci/view/web/sysauth.htm
+sed -i 's/="download"/="rtname"/' $MOUNTFILESPATH/lua/luci/view/web/sysauth.htm
+sed -i 's/<div class="code"><\/div>/<%=router_name%>/' $MOUNTFILESPATH/lua/luci/view/web/sysauth.htm
+sed -i 's/="tip"/=""/' $MOUNTFILESPATH/lua/luci/view/web/sysauth.htm
+sed -i 's/使用小米WiFi APP免除记密码烦恼//' $MOUNTFILESPATH/lua/luci/view/web/sysauth.htm
+##
+
+##给予可执行权限
+chmod +x $MIWIFIPATH/bin/*
+##chmod +x $MIWIFIPATH/bin/adm/adm
+chmod +x $MIWIFIPATH/bin/kp/koolproxy
+chmod +x /etc/init.d/shadowsocks
+##chmod +x /etc/init.d/adm
+chmod +x /etc/init.d/kp
+chmod +x /etc/init.d/ngrok
+##
+
+##添加重启后的文件完整性检测
+[ -z $(uci -q get firewall.miwifiplus) ] || uci delete firewall.miwifiplus
+uci commit firewall
+[ -z $(uci -q get firewall.miwifiplus) ] && uci set firewall.miwifiplus=include
+uci set firewall.miwifiplus.path=$MIWIFIPATH/scripts/yuneoninit
+uci set firewall.miwifiplus.reload=1
+uci commit firewall
+##
+
+mount --bind $MOUNTFILESPATH/lua $LUAPATH
+mount --bind $MOUNTFILESPATH/ddns $DDNSPATH
+mount --bind $MOUNTFILESPATH/css $CSSPATH
+mount --bind $MOUNTFILESPATH/img $IMGPATH
+
+rm -rf /tmp/luci-modulecache
+rm -rf /tmp/luci-indexcache
+
+##/etc/init.d/adm restart &>/dev/null
+/etc/init.d/kp restart &>/dev/null
+/usr/sbin/ddnsd reload &>/dev/null
+/etc/init.d/ngrok restart &>/dev/null
+/etc/init.d/shadowsocks restart &>/dev/null
+
+return 0
