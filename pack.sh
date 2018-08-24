@@ -5,6 +5,6 @@ do
 	echo "开始打包$i..."
 	cd "$i"/
 	[ -f yuneon.tar.gz ] && mv -f yuneon.tar.gz yuneon.tar.gz.bak
-	tar zcvf yuneon.tar.gz yuneon/
+	tar cvf yuneon.tar.gz yuneon/
 	cd ..
 done
