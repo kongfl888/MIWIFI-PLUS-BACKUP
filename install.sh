@@ -1,6 +1,6 @@
 ﻿#!/bin/sh
 
-pluginhost="coding.net/u/monlor/p/MIWIFI-PLUS-BACKUP/git/raw/master"
+pluginhost="github.com/kongfl888/MIWIFI-PLUS-BACKUP/raw/master"
 clear
 echo "Miwifi Plus安装程序"
 echo "反馈请加QQ群1（已满）：162049771；群2：110678294"
